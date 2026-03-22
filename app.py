@@ -277,7 +277,7 @@ def mark_discounted(log_id):
     log = ParkingLog.query.get_or_404(log_id)
     if status == 'not_found':
         log.is_discounted = False
-        log.remarks = (log.remarks + " [차량미검색]") if log.remarks else "[차량미검색]"
+        log.remarks = (log.remarks + " [차량번호 확인 안됨]") if log.remarks else "[차량번호 확인 안됨]"
     else:
         log.is_discounted = True
         
