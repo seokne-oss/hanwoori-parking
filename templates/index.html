@@ -1,0 +1,185 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한우리교회 주차 등록</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts: Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --hanwoori-green: #006a4e; /* 교회 홈페이지 대표 녹색 */
+            --background-grey: #f8f9fa;
+        }
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--background-grey);
+        }
+        .main-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-top: 2rem;
+            max-width: 600px;
+        }
+        .btn-primary {
+            background-color: var(--hanwoori-green);
+            border-color: var(--hanwoori-green);
+            font-weight: 500;
+        }
+        .btn-primary:hover {
+            background-color: #005841;
+            border-color: #005841;
+        }
+        .form-control:focus {
+            border-color: var(--hanwoori-green);
+            box-shadow: 0 0 0 0.25rem rgba(0, 106, 78, 0.25);
+        }
+        /* 라디오 버튼을 버튼처럼 보이게 하는 스타일 */
+        .btn-check:checked+.btn-outline-info {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+        }
+        .btn-check:checked+.btn-outline-success {
+            background-color: #198754;
+            border-color: #198754;
+            color: white;
+        }
+        .btn-check:checked+.btn-outline-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: white;
+        }
+        .status-link a {
+            color: var(--hanwoori-green);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .status-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="text-center mb-4">
+            <img src="{{ url_for('static', filename='IMG/CI_home.png') }}" alt="한우리교회 로고" style="width: 100px; height: auto;">
+            <h1 class="h3 mt-2">주일 예배 주차 등록</h1>
+        </div>
+        <p class="text-center text-muted">광명역 D주차장 이용 성도님께서는<br>아래 정보를 입력해주세요.</p>
+
+        {% set messages = get_flashed_messages(with_categories=true) %}
+        
+        {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show my-4" role="alert">
+                {{ message | safe }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center my-4 status-link">
+                <a href="{{ url_for('status') }}">이미 등록하셨나요? 내 등록 현황 확인하기</a>
+            </div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="mb-3">
+                <label for="name" class="form-label">이름</label>
+                <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="mb-3">
+                <label for="phone" class="form-label">전화번호</label>
+                <input type="tel" class="form-control" id="phone" name="phone" placeholder="010-1234-5678" required>
+            </div>
+            <div class="mb-3">
+                <label for="car_number" class="form-label">차량번호 전체</label>
+                <input type="text" class="form-control" id="car_number" name="car_number" 
+                       placeholder="예: 12가 3456" 
+                       pattern="^(\d{2,3}|[가-힣]{2}\d{2})\s?[가-힣]\s?\d{4}$" 
+                       title="올바른 차량 번호 형식을 입력해주세요. (예: 12가 3456 / 123가 3456)" required>
+                <div class="form-text mt-1">숫자와 한글을 포함해 정확히 입력해 주세요.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">출차 예상 시간</label>
+                <div class="d-flex justify-content-between gap-2">
+                    <input type="radio" class="btn-check" name="stay_hours" id="time-3" value="3시간" autocomplete="off" required>
+                    <label class="btn btn-outline-info w-100" for="time-3">3시간</label>
+
+                    <input type="radio" class="btn-check" name="stay_hours" id="time-6" value="6시간" autocomplete="off" required>
+                    <label class="btn btn-outline-success w-100" for="time-6">6시간</label>
+
+                    <input type="radio" class="btn-check" name="stay_hours" id="time-etc" value="기타" autocomplete="off" required>
+                    <label class="btn btn-outline-secondary w-100" for="time-etc">기타</label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="remarks" class="form-label">비고</label>
+                <input type="text" class="form-control" id="remarks" name="remarks" placeholder="예: 오후 늦게 출차 예정" maxlength="30">
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2 mt-3">등록하기</button>
+
+        </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const phoneInput = document.getElementById('phone');
+            const remarksInput = document.getElementById('remarks');
+            const timeOptions = document.querySelectorAll('input[name="stay_hours"]');
+
+            // 전화번호 자동 하이픈 기능
+            phoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, ''); // 숫자만 추출
+                if (value.startsWith('010')) {
+                    if (value.length > 3 && value.length <= 7) {
+                        value = value.slice(0, 3) + '-' + value.slice(3);
+                    } else if (value.length > 7) {
+                        value = value.slice(0, 3) + '-' + value.slice(3, 7) + '-' + value.slice(7, 11);
+                    }
+                }
+                e.target.value = value;
+            });
+
+            // '기타' 선택 시 비고 필드 필수 처리 기능
+            function toggleRemarksRequired() {
+                const etcRadio = document.getElementById('time-etc');
+                if (etcRadio.checked) {
+                    remarksInput.required = true;
+                    remarksInput.placeholder = "내용을 반드시 입력해주세요.";
+                } else {
+                    remarksInput.required = false;
+                    remarksInput.placeholder = "예: 오후 늦게 출차 예정";
+                }
+            }
+
+            // 차량 번호 실시간 형식 체크 (옵션)
+            const carNumberInput = document.getElementById('car_number');
+            carNumberInput.addEventListener('blur', function() {
+                const val = this.value.trim();
+                const carPattern = /^(\d{2,3}|[가-힣]{2}\d{2})\s?[가-힣]\s?\d{4}$/;
+                if (val && !carPattern.test(val)) {
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-invalid');
+                }
+            });
+
+            carNumberInput.addEventListener('input', function() {
+                this.classList.remove('is-invalid');
+            });
+
+            timeOptions.forEach(radio => {
+                radio.addEventListener('change', toggleRemarksRequired);
+            });
+            toggleRemarksRequired(); // 페이지 로드 시 초기 상태 확인
+        });
+    </script>
+</body>
+</html>
