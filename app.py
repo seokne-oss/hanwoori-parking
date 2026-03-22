@@ -42,7 +42,7 @@ class ParkingLog(db.Model):
             return {'text': '주차처리완료', 'class': 'success', 'bg': 'success'}
         
         if self.remarks and '[차량번호 확인 안됨]' in self.remarks:
-            return {'text': '차량번호 미확인', 'class': 'danger', 'bg': 'danger'}
+            return {'text': '차량번호 확인 안됨', 'class': 'danger', 'bg': 'danger'}
         
         return {'text': '차량번호 확인 중', 'class': 'warning', 'bg': 'warning'}
 
