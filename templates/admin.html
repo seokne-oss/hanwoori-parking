@@ -187,7 +187,7 @@
                                                 </div>
                                                 <button class="btn process-btn py-2 px-3"
                                                     onclick="markAsProcessed({{ log.id }})">
-                                                    완료하기
+                                                    확인
                                                 </button>
                                             </div>
                                         </div>
@@ -244,15 +244,11 @@
                                                         log.stay_hours }}</span>
                                                     {% endif %}
 
-                                                    {% if log.is_discounted %}
-                                                    <span
-                                                        class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2"><i
-                                                            class="bi bi-check-circle-fill me-1"></i>할인완료</span>
-                                                    {% else %}
-                                                    <span
-                                                        class="badge bg-light text-muted border rounded-pill px-3 py-2"><i
-                                                            class="bi bi-clock-history me-1"></i>할인대기</span>
-                                                    {% endif %}
+                                                    {% set status = log.get_status() %}
+                                                    <span class="badge bg-{{ status.bg }}-subtle text-{{ status.bg }}-emphasis rounded-pill px-3 py-2">
+                                                        {% if status.bg == 'success' %}<i class="bi bi-check-circle-fill me-1"></i>{% elif status.bg == 'warning' %}<i class="bi bi-hourglass-split me-1"></i>{% elif status.bg == 'danger' %}<i class="bi bi-exclamation-circle-fill me-1"></i>{% endif %}
+                                                        {{ status.text }}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div
@@ -464,7 +460,7 @@
                     const pendingContainer = document.querySelector('#pending-collapse .accordion-body');
                     if (pendingContainer) {
                         pendingContainer.prepend(card);
-                        button.textContent = '완료하기';
+                        button.textContent = '확인';
                     } else location.reload();
                 }
             } catch (error) {

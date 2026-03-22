@@ -33,6 +33,19 @@ class ParkingLog(db.Model):
     # 나이스파크 할인 적용 여부 (기본값: False)
     is_discounted = db.Column(db.Boolean, default=False, nullable=False)
 
+    def get_status(self):
+        """통합 상태 정보를 반환합니다."""
+        if not self.is_processed:
+            return {'text': '미처리', 'class': 'secondary', 'bg': 'secondary'}
+        
+        if self.is_discounted:
+            return {'text': '주차처리완료', 'class': 'success', 'bg': 'success'}
+        
+        if self.remarks and '[차량번호 확인 안됨]' in self.remarks:
+            return {'text': '차량번호 미확인', 'class': 'danger', 'bg': 'danger'}
+        
+        return {'text': '차량번호 확인 중', 'class': 'warning', 'bg': 'warning'}
+
 # gunicorn 등 외부 실행 환경에서도 DB 테이블을 자동 생성
 with app.app_context():
     db.create_all()
