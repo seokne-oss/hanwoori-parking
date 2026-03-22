@@ -17,6 +17,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# gunicorn 등 외부 실행 환경에서도 DB 테이블을 자동 생성
+with app.app_context():
+    db.create_all()
+
 # --- 데이터베이스 모델 (테이블) 정의 ---
 class ParkingLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -284,10 +288,6 @@ def mark_discounted(log_id):
 if __name__ == '__main__':
     import os
     print("스크립트 실행 시작...")
-    with app.app_context():
-        print("데이터베이스 테이블 생성 시도...")
-        db.create_all()
-        print("데이터베이스 테이블 생성 완료.")
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") != "production"
     print(f"Flask 서버를 시작합니다... (port={port}, debug={debug})")
