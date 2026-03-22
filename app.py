@@ -282,12 +282,13 @@ def mark_discounted(log_id):
 
 # --- 애플리케이션 실행 ---
 if __name__ == '__main__':
+    import os
     print("스크립트 실행 시작...")
-    # 애플리케이션 컨텍스트 내에서 데이터베이스 테이블 생성
     with app.app_context():
         print("데이터베이스 테이블 생성 시도...")
         db.create_all()
         print("데이터베이스 테이블 생성 완료.")
-    # debug=True는 개발용, host='0.0.0.0'은 외부 접속 허용
-    print("Flask 서버를 시작합니다...")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_ENV") != "production"
+    print(f"Flask 서버를 시작합니다... (port={port}, debug={debug})")
+    app.run(debug=debug, host='0.0.0.0', port=port)
