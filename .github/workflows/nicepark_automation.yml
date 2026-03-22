@@ -1,0 +1,35 @@
+name: NicePark Parking Discount Automation
+
+on:
+  schedule:
+    # 매주 일요일 한국 시간(KST) 오전 9시~12시 사이에 20분 간격으로 실행
+    # UTC 기준: 일요일 00:00, 00:20, 00:40, 01:00, 01:20, 01:40, 02:00, 02:20, 02:40, 03:00
+    - cron: '0,20,40 0,1,2 * * 0'
+  workflow_dispatch: # 수동 실행 버튼 허용
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run NicePark Bot
+        env:
+          FLASK_SERVER_URL: ${{ secrets.FLASK_SERVER_URL }}
+          NICEPARK_ID: ${{ secrets.NICEPARK_ID }}
+          NICEPARK_PW: ${{ secrets.NICEPARK_PW }}
+          RUN_ONCE: "true" # 1회 실행 후 종료
+          GITHUB_ACTIONS: "true"
+        run: python nicepark_bot.py
