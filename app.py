@@ -17,9 +17,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# gunicorn 등 외부 실행 환경에서도 DB 테이블을 자동 생성
-with app.app_context():
-    db.create_all()
 
 # --- 데이터베이스 모델 (테이블) 정의 ---
 class ParkingLog(db.Model):
@@ -35,6 +32,10 @@ class ParkingLog(db.Model):
     is_processed = db.Column(db.Boolean, default=False, nullable=False)
     # 나이스파크 할인 적용 여부 (기본값: False)
     is_discounted = db.Column(db.Boolean, default=False, nullable=False)
+
+# gunicorn 등 외부 실행 환경에서도 DB 테이블을 자동 생성
+with app.app_context():
+    db.create_all()
 
 # --- 라우트(URL) 및 기능 정의 ---
 
