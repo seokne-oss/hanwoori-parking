@@ -95,6 +95,26 @@
                         <span>출차 예상</span>
                         <strong>{{ log.stay_hours }}</strong>
                     </li>
+                    {% if log.entry_time and log.is_discounted %}
+                    <li class="list-group-item">
+                        <div class="small text-primary text-center">
+                            <i class="bi bi-clock-history me-1"></i>입차: {{ log.entry_time }}
+                            <br>
+                            {% set entry_h = log.entry_time.split(':')[0] | int %}
+                            {% set entry_m = log.entry_time.split(':')[1] | int %}
+                            {% set disc_h = 3 %}
+                            {% if '6시간' in log.stay_hours %}{% set disc_h = 6 %}
+                            {% elif '24시간' in log.stay_hours %}{% set disc_h = 24 %}
+                            {% elif '2시간' in log.stay_hours %}{% set disc_h = 2 %}{% endif %}
+                            
+                            {% set total_m = entry_h * 60 + entry_m + disc_h * 60 %}
+                            {% set expire_h = (total_m // 60) % 24 %}
+                            {% set expire_m = total_m % 60 %}
+                            
+                            <strong>({{ "%02d"|format(expire_h) }}시 {{ "%02d"|format(expire_m) }}분까지 {{ disc_h }}시간 할인 적용되었습니다)</strong>
+                        </div>
+                    </li>
+                    {% endif %}
                 </ul>
             </div>
             {% endfor %}

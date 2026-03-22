@@ -32,6 +32,8 @@ class ParkingLog(db.Model):
     is_processed = db.Column(db.Boolean, default=False, nullable=False)
     # 나이스파크 할인 적용 여부 (기본값: False)
     is_discounted = db.Column(db.Boolean, default=False, nullable=False)
+    # 나이스파크에서 수집한 실제 입차 시간 (형식: HH:MM)
+    entry_time = db.Column(db.String(20), nullable=True)
 
     def get_status(self):
         """통합 상태 정보를 반환합니다."""
@@ -142,10 +144,33 @@ def admin():
     today_logs = ParkingLog.query.filter(ParkingLog.created_at >= view_start_time).order_by(ParkingLog.is_processed.asc(), ParkingLog.created_at.asc()).all()
     past_logs = ParkingLog.query.filter(ParkingLog.created_at < view_start_time).order_by(ParkingLog.is_processed.asc(), ParkingLog.created_at.asc()).all()
     
+    # 상태별 그룹화 (템플릿 복잡도 감소 및 오류 방지)
+    unconfirmed_logs = [log for log in today_logs if not log.is_processed]
+    checking_logs = []
+    not_found_logs = []
+    completed_logs = []
+    
+    for log in today_logs:
+        if log.is_processed:
+            if log.is_discounted:
+                completed_logs.append(log)
+            else:
+                if log.remarks and '[차량번호 확인 안됨]' in log.remarks:
+                    not_found_logs.append(log)
+                else:
+                    checking_logs.append(log)
+    
     # VSCode 편집기 오류 방지를 위해 SVG 코드를 변수로 전달
     copy_icon_svg = '<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"></path><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zM-1 7a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1zM8 1.5A1.5 1.5 0 0 0 6.5 0h-3A1.5 1.5 0 0 0 2 1.5v1A1.5 1.5 0 0 0 3.5 4h3A1.5 1.5 0 0 0 8 2.5v-1z"></path></svg>'
 
-    return render_template('admin.html', today_logs=today_logs, past_logs=past_logs, copy_icon_svg=copy_icon_svg)
+    return render_template('admin.html', 
+                          today_logs=today_logs, 
+                          past_logs=past_logs, 
+                          unconfirmed_logs=unconfirmed_logs,
+                          checking_logs=checking_logs,
+                          not_found_logs=not_found_logs,
+                          completed_logs=completed_logs,
+                          copy_icon_svg=copy_icon_svg)
 
 # 4. 성도용 상태 조회 페이지
 @app.route('/status', methods=['GET'])
@@ -170,7 +195,6 @@ def status():
     return render_template('status.html', logs=logs, phone=phone)
 
 
-# 3. 처리 완료 상태를 업데이트하는 API
 @app.route('/admin/process/<int:log_id>', methods=['POST'])
 def process_log(log_id):
     # 로그인 상태가 아니면 접근 거부
@@ -178,10 +202,19 @@ def process_log(log_id):
         return {'status': 'error', 'message': 'Unauthorized'}, 401
 
     log = ParkingLog.query.get_or_404(log_id)
-    # is_processed 상태를 반전시킴 (True -> False, False -> True)
-    log.is_processed = not log.is_processed
+    
+    # 추가: 할인 시간을 명시적으로 요청한 경우 (어드민에서 3h, 6h, 24h 등 선택)
+    requested_hours = request.json.get('stay_hours') if request.is_json else request.form.get('stay_hours')
+    
+    if requested_hours:
+        log.stay_hours = requested_hours
+        log.is_processed = True # 명시적 시간 선택 시 처리 완료로 간주
+    else:
+        # 기존: is_processed 상태를 반전시킴 (True -> False, False -> True)
+        log.is_processed = not log.is_processed
+    
     db.session.commit()
-    return {'status': 'success', 'is_processed': log.is_processed}
+    return {'status': 'success', 'is_processed': log.is_processed, 'stay_hours': log.stay_hours}
 
 
 # 5. 이전 기록 삭제 기능
@@ -266,9 +299,12 @@ def get_pending_discounts():
     kst = timezone(timedelta(hours=9))
     one_day_ago = datetime.now(kst) - timedelta(days=1)
     
+    # 봉사자가 '확인'을 눌렀고(is_processed), 아직 할인 전이며(is_discounted=False), 
+    # 차량번호 미확인 오류([차량번호 확인 안됨])가 없는 '확인 중' 상태의 데이터만 조회
     pending = ParkingLog.query.filter(
         ParkingLog.is_processed == True,
         ParkingLog.is_discounted == False,
+        (ParkingLog.remarks == None) | (~ParkingLog.remarks.contains('[차량번호 확인 안됨]')),
         ParkingLog.created_at >= one_day_ago
     ).all()
     
@@ -277,6 +313,7 @@ def get_pending_discounts():
         'items': [{
             'id': p.id,
             'car_number': p.car_number,
+            'full_car_number': p.car_number, # 호환성을 위해 추가
             'stay_hours': p.stay_hours,
             'name': p.name
         } for p in pending]
@@ -284,8 +321,10 @@ def get_pending_discounts():
 
 @app.route('/api/mark-discounted/<int:log_id>', methods=['POST'])
 def mark_discounted(log_id):
-    # status가 'not_found'인 경우 차량 없음으로 처리
-    status = request.json.get('status', 'success') if request.is_json else request.args.get('status', 'success')
+    # JSON 바디 또는 폼 데이터에서 정보 추출
+    data = request.json if request.is_json else request.form
+    status = data.get('status', 'success')
+    entry_time = data.get('entry_time')
     
     log = ParkingLog.query.get_or_404(log_id)
     if status == 'not_found':
@@ -293,9 +332,11 @@ def mark_discounted(log_id):
         log.remarks = (log.remarks + " [차량번호 확인 안됨]") if log.remarks else "[차량번호 확인 안됨]"
     else:
         log.is_discounted = True
+        if entry_time:
+            log.entry_time = entry_time
         
     db.session.commit()
-    return {'status': 'success', 'log_id': log_id, 'result': status}
+    return {'status': 'success', 'log_id': log_id, 'result': status, 'entry_time': log.entry_time}
 
 
 # --- 애플리케이션 실행 ---
