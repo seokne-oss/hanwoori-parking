@@ -26,13 +26,9 @@ class ParkingLog(db.Model):
     car_number = db.Column(db.String(20), nullable=False)
     stay_hours = db.Column(db.String(50), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False)
-    # '기타' 선택 시 비고를 저장할 컬럼 추가
     remarks = db.Column(db.String(100), nullable=True)
-    # is_processed 컬럼 추가: 봉사자가 처리했는지 여부 (기본값: False)
     is_processed = db.Column(db.Boolean, default=False, nullable=False)
-    # 나이스파크 할인 적용 여부 (기본값: False)
     is_discounted = db.Column(db.Boolean, default=False, nullable=False)
-    # 나이스파크에서 수집한 실제 입차 시간 (형식: HH:MM)
     entry_time = db.Column(db.String(20), nullable=True)
 
     def get_status(self):
@@ -48,9 +44,48 @@ class ParkingLog(db.Model):
         
         return {'text': '차량번호 확인 중', 'class': 'warning', 'bg': 'warning'}
 
+class SystemSetting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False)
+    value = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(200))
+
 # gunicorn 등 외부 실행 환경에서도 DB 테이블을 자동 생성
 with app.app_context():
     db.create_all()
+    # 초기 설정값 생성 (없을 경우)
+    if not SystemSetting.query.filter_by(key='service_mode').first():
+        db.session.add(SystemSetting(key='service_mode', value='auto_sunday', description='서비스 운영 모드 (manual_on, manual_off, auto_sunday)'))
+        db.session.commit()
+
+# --- 서비스 가동 시간 체크 미들웨어 ---
+@app.before_request
+def check_service_availability():
+    # 관리자 페이지, 정적 파일, API, 안내 페이지는 체크 제외
+    exempt_paths = ['/admin', '/login', '/logout', '/static', '/api', '/service-unavailable', '/create_test_data']
+    if any(request.path.startswith(path) for path in exempt_paths):
+        return None
+
+    # 서비스 모드 확인
+    mode_setting = SystemSetting.query.filter_by(key='service_mode').first()
+    mode = mode_setting.value if mode_setting else 'auto_sunday'
+
+    if mode == 'manual_on':
+        return None
+    elif mode == 'manual_off':
+        return redirect(url_for('service_unavailable'))
+    else: # auto_sunday
+        # 한국 시간 기준 요일 확인 (0: 월, 6: 일)
+        kst = timezone(timedelta(hours=9))
+        now_kst = datetime.now(kst)
+        if now_kst.weekday() == 6: # 일요일
+            return None
+        else:
+            return redirect(url_for('service_unavailable'))
+
+@app.route('/service-unavailable')
+def service_unavailable():
+    return render_template('service_unavailable.html')
 
 # --- 라우트(URL) 및 기능 정의 ---
 
@@ -163,6 +198,10 @@ def admin():
     # VSCode 편집기 오류 방지를 위해 SVG 코드를 변수로 전달
     copy_icon_svg = '<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"></path><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zM-1 7a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1zM8 1.5A1.5 1.5 0 0 0 6.5 0h-3A1.5 1.5 0 0 0 2 1.5v1A1.5 1.5 0 0 0 3.5 4h3A1.5 1.5 0 0 0 8 2.5v-1z"></path></svg>'
 
+    # 서비스 모드 정보 추가
+    service_mode = SystemSetting.query.filter_by(key='service_mode').first()
+    service_mode_value = service_mode.value if service_mode else 'auto_sunday'
+
     return render_template('admin.html', 
                           today_logs=today_logs, 
                           past_logs=past_logs, 
@@ -170,7 +209,8 @@ def admin():
                           checking_logs=checking_logs,
                           not_found_logs=not_found_logs,
                           completed_logs=completed_logs,
-                          copy_icon_svg=copy_icon_svg)
+                          copy_icon_svg=copy_icon_svg,
+                          service_mode=service_mode_value)
 
 # 4. 성도용 상태 조회 페이지
 @app.route('/status', methods=['GET'])
@@ -215,6 +255,25 @@ def process_log(log_id):
     
     db.session.commit()
     return {'status': 'success', 'is_processed': log.is_processed, 'stay_hours': log.stay_hours}
+
+# 4-1. 설정 변경 API
+@app.route('/admin/update_setting', methods=['POST'])
+def update_setting():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    key = request.form.get('key')
+    value = request.form.get('value')
+    
+    setting = SystemSetting.query.filter_by(key=key).first()
+    if setting:
+        setting.value = value
+        db.session.commit()
+        flash(f'설정이 변경되었습니다: {value}', 'success')
+    else:
+        flash('존재하지 않는 설정 키입니다.', 'danger')
+        
+    return redirect(url_for('admin'))
 
 
 # 5. 이전 기록 삭제 기능
