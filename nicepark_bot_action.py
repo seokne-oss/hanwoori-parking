@@ -100,18 +100,28 @@ def run_bot():
 
         print(f"[진행] 자동 로그인 시도 중... (ID: {NICEPARK_ID[:3]}***)")
         try:
-            # 1. 아이디 입력 (수정된 ID 적용)
-            print("   -> 아이디 필드 대기 중...")
+            # 1. 아이디 입력 (JS 주입 + 이벤트 트리거로 프레임워크 인식 유도)
+            print("   -> 아이디 필드 입력 및 이벤트 발생 중...")
             user_field = wait.until(EC.visibility_of_element_located((By.ID, "mf_wfm_body_ibx_empCd")))
-            driver.execute_script("arguments[0].value = arguments[1];", user_field, NICEPARK_ID)
-            print("   -> 아이디 입력 완료")
+            driver.execute_script("""
+                arguments[0].value = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+            """, user_field, NICEPARK_ID)
+            print("   -> 아이디 동기화 완료")
             
-            # 2. 비밀번호 입력 (수정된 ID 적용)
+            # 2. 비밀번호 입력 (JS 주입 + 이벤트 트리거)
             pw_field = driver.find_element(By.ID, "mf_wfm_body_sct_password")
-            driver.execute_script("arguments[0].value = arguments[1];", pw_field, NICEPARK_PW)
-            print("   -> 비밀번호 입력 완료")
+            driver.execute_script("""
+                arguments[0].value = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+            """, pw_field, NICEPARK_PW)
+            print("   -> 비밀번호 동기화 완료")
             
-            # 3. 로그인 버튼 클릭 (정확한 ID 적용)
+            # 3. 로그인 버튼 클릭
             print("   -> 로그인 버튼 클릭 중...")
             login_btn = driver.find_element(By.ID, "mf_wfm_body_btn_login")
             driver.execute_script("arguments[0].click();", login_btn)
