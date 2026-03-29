@@ -78,10 +78,13 @@
         
         {% if messages %}
             {% for category, message in messages %}
+              {# 어드민 전용 메시지(admin_info)는 일반 사용자 페이지에서 숨김 #}
+              {% if category != 'admin_info' %}
               <div class="alert alert-{{ category }} alert-dismissible fade show my-4" role="alert">
                 {{ message | safe }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               </div>
+              {% endif %}
             {% endfor %}
         {% else %}
             <div class="text-center my-4 status-link">

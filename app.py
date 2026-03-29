@@ -295,7 +295,7 @@ def delete_old_logs():
         
         num_deleted = ParkingLog.query.filter(ParkingLog.created_at < today_start).delete()
         db.session.commit()
-        flash(f'오늘 이전의 주차 기록 {num_deleted}건이 삭제되었습니다.', 'success')
+        flash(f'오늘 이전의 주차 기록 {num_deleted}건이 삭제되었습니다.', 'admin_info')
     except Exception as e:
         db.session.rollback()
         flash(f'기록 삭제 중 오류가 발생했습니다: {e}', 'danger')
@@ -333,7 +333,8 @@ def create_test_data():
             db.session.add(new_log)
         
         db.session.commit()
-        flash(f'미승인 상태의 테스트 데이터 {len(test_cars)}건이 생성되었습니다.', 'success')
+        # 카테고리를 'admin_info'로 지정하여 어드민 페이지에서만 보이게 함
+        flash(f'미승인 상태의 테스트 데이터 {len(test_cars)}건이 생성되었습니다.', 'admin_info')
 
     except Exception as e:
         db.session.rollback()
@@ -349,9 +350,9 @@ def delete_all_data():
         return redirect(url_for('login'))
 
     try:
-        num_deleted = db.session.query(ParkingLog).delete()
+        db.session.query(ParkingLog).delete()
         db.session.commit()
-        flash(f'모든 주차 기록 {num_deleted}건이 영구적으로 삭제되었습니다.', 'danger')
+        flash(f'모든 주차 기록 {num_deleted}건이 영구적으로 삭제되었습니다.', 'admin_info')
     except Exception as e:
         db.session.rollback()
         flash(f'전체 기록 삭제 중 오류가 발생했습니다: {e}', 'danger')

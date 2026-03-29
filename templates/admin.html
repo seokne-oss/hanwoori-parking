@@ -114,6 +114,19 @@
                     </button>
                 </div>
 
+                {# --- 알림창 (Flash Messages) 추가 --- #}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      {# admin_info는 info 스타일로, 나머지는 원래 스타일대로 표시 #}
+                      <div class="alert alert-{{ 'info' if category == 'admin_info' else category }} alert-dismissible fade show my-3 border-0 shadow-sm" role="alert" style="border-radius: 12px;">
+                        <i class="bi bi-info-circle-fill me-2"></i> {{ message | safe }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
                 <!-- 시스템 운영 설정 섹션 -->
                 <div class="card mb-3 border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
                     <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">

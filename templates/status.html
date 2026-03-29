@@ -64,9 +64,12 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
+              {# 어드민 전용 메시지(admin_info)는 여기서는 숨김 #}
+              {% if category != 'admin_info' %}
               <div class="alert alert-{{ category }} mt-4" role="alert">
                 {{ message }}
               </div>
+              {% endif %}
             {% endfor %}
           {% endif %}
         {% endwith %}
