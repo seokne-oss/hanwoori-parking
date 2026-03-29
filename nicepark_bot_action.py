@@ -100,20 +100,21 @@ def run_bot():
 
         print(f"[진행] 자동 로그인 시도 중... (ID: {NICEPARK_ID[:3]}***)")
         try:
-            # 1. 아이디 입력 (JS 방식으로 확실하게 주입)
+            # 1. 아이디 입력 (수정된 ID 적용)
             print("   -> 아이디 필드 대기 중...")
-            user_field = wait.until(EC.visibility_of_element_located((By.ID, "user_id")))
+            user_field = wait.until(EC.visibility_of_element_located((By.ID, "mf_wfm_body_ibx_empCd")))
             driver.execute_script("arguments[0].value = arguments[1];", user_field, NICEPARK_ID)
             print("   -> 아이디 입력 완료")
             
-            # 2. 비밀번호 입력 (JS 방식으로 확실하게 주입)
-            pw_field = driver.find_element(By.ID, "user_pw")
+            # 2. 비밀번호 입력 (수정된 ID 적용)
+            pw_field = driver.find_element(By.ID, "mf_wfm_body_sct_password")
             driver.execute_script("arguments[0].value = arguments[1];", pw_field, NICEPARK_PW)
             print("   -> 비밀번호 입력 완료")
             
             # 3. 로그인 버튼 클릭
             print("   -> 로그인 버튼 클릭 중...")
-            login_btn = driver.find_element(By.ID, "btn_login")
+            # LOGIN 텍스트를 가진 버튼 또는 링크 탐색
+            login_btn = driver.find_element(By.XPATH, "//*[text()='LOGIN' or text()='로그인']")
             driver.execute_script("arguments[0].click();", login_btn)
             
             # 4. 로그인 결과 대기 (조회 버튼 등장 확인)
