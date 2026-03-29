@@ -134,27 +134,39 @@ def run_bot():
                         time.sleep(1.5)
                         
                         # --- 알림창 감지 ---
+                        # --- 알림창 감지 (중복 할인 등) ---
                         alert_found = False
                         try:
+                            # 1. '이미 처리됨' 혹은 '사용매수 제한' 관련 텍스트 확인
+                            page_text = driver.page_source
+                            if "최대 사용매수" in page_text or "이미 사용" in page_text:
+                                print(f"   [알림] 이미 할인이 적용된 차량입니다. ({car_number})")
+                                alert_found = True
+                            
+                            # 2. 알림창의 [확인] 버튼 탐색 및 클릭
                             selectors = [
-                                (By.CSS_SELECTOR, "input[id$='_btn_conf']"),
-                                (By.CSS_SELECTOR, ".w2trigger.btn_cm.pt")
+                                (By.CSS_SELECTOR, "input[id$='_btn_conf']"), # WebSquare 표준 확인 버튼
+                                (By.XPATH, "//input[@value='확인']"),
+                                (By.XPATH, "//*[contains(text(), '확인')]")
                             ]
                             for by_type, selector in selectors:
                                 btns = driver.find_elements(by_type, selector)
                                 for btn in btns:
                                     if btn.is_displayed():
-                                        btn.click()
-                                        print("   [조치] 알림창 감지 및 닫기 완료")
-                                        time.sleep(0.5)
-                                        clear_input_field(driver)
+                                        driver.execute_script("arguments[0].click();", btn)
+                                        print("   [조치] 중복 할인 알림창 닫기 완료")
                                         alert_found = True
                                         break
                                 if alert_found: break
+                            
+                            if alert_found:
+                                time.sleep(1.0)
+                                clear_input_field(driver)
                         except: pass
                         
                         if alert_found:
-                            mark_as_discounted(log_id, status='not_found')
+                            # 이미 할인이 되어 있으므로 성공(success)으로 간주하여 목록에서 제외
+                            mark_as_discounted(log_id, status='success', entry_time='이미 적용됨')
                             continue
 
                         # --- 상세 매칭 및 입차시간 수집 ---

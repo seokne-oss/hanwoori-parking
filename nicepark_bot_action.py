@@ -81,8 +81,12 @@ def run_bot():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
 
+    # 차단 회피를 위한 User-Agent 설정
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    chrome_options.add_argument(f"user-agent={user_agent}")
+    
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    wait = WebDriverWait(driver, 15)
+    wait = WebDriverWait(driver, 20) # 대기 시간 20초로 연장
 
     try:
         # 1. 나이스파크 접속
@@ -96,10 +100,19 @@ def run_bot():
 
         print(f"[진행] 자동 로그인 시도 중... (ID: {NICEPARK_ID[:3]}***)")
         try:
-            wait.until(EC.presence_of_element_located((By.ID, "user_id"))).send_keys(NICEPARK_ID)
-            driver.find_element(By.ID, "user_pw").send_keys(NICEPARK_PW)
-            driver.find_element(By.ID, "btn_login").click()
-            time.sleep(2)
+            # 입력 필드 대기 및 값 입력
+            user_field = wait.until(EC.presence_of_element_located((By.ID, "user_id")))
+            user_field.clear()
+            user_field.send_keys(NICEPARK_ID)
+            
+            pw_field = driver.find_element(By.ID, "user_pw")
+            pw_field.clear()
+            pw_field.send_keys(NICEPARK_PW)
+            
+            # 로그인 버튼 클릭 (JS 방식으로 안정성 확보)
+            login_btn = driver.find_element(By.ID, "btn_login")
+            driver.execute_script("arguments[0].click();", login_btn)
+            time.sleep(3)
             
             # 로그인 후 메인 페이지 또는 할인 등록 페이지로 이동했는지 확인
             # '조회' 버튼이 있는지 확인하여 로그인 성공 여부 판단
@@ -107,6 +120,9 @@ def run_bot():
             print("[확인] 자동 로그인 성공 및 할인 페이지 진입!")
         except Exception as e:
             print(f"[에러] 자동 로그인 실패 또는 페이지 진입 불가: {e}")
+            # 진단용 스크린샷 저장 (GHA Artifact로 업로드 예정)
+            driver.save_screenshot("login_error.png")
+            print("[조치] 진단용 스크린샷(login_error.png) 저장 완료")
             return
         
         while True:
@@ -145,28 +161,39 @@ def run_bot():
                         wait.until(EC.element_to_be_clickable((By.ID, "mf_wfm_body_wq_uuid_162"))).click()
                         time.sleep(1.5)
                         
-                        # --- 알림창 감지 ---
+                        # --- 알림창 감지 (중복 할인 등) ---
                         alert_found = False
                         try:
+                            # 1. '이미 처리됨' 혹은 '사용매수 제한' 관련 텍스트 확인
+                            page_text = driver.page_source
+                            if "최대 사용매수" in page_text or "이미 사용" in page_text:
+                                print(f"   [알림] 이미 할인이 적용된 차량입니다. ({car_number})")
+                                alert_found = True
+                            
+                            # 2. 알림창의 [확인] 버튼 탐색 및 클릭
                             selectors = [
-                                (By.CSS_SELECTOR, "input[id$='_btn_conf']"),
-                                (By.CSS_SELECTOR, ".w2trigger.btn_cm.pt")
+                                (By.CSS_SELECTOR, "input[id$='_btn_conf']"), # WebSquare 표준 확인 버튼
+                                (By.XPATH, "//input[@value='확인']"),
+                                (By.XPATH, "//*[contains(text(), '확인')]")
                             ]
                             for by_type, selector in selectors:
                                 btns = driver.find_elements(by_type, selector)
                                 for btn in btns:
                                     if btn.is_displayed():
-                                        btn.click()
-                                        print("   [조치] 알림창 감지 및 닫기 완료")
-                                        time.sleep(0.5)
-                                        clear_input_field(driver)
+                                        driver.execute_script("arguments[0].click();", btn)
+                                        print("   [조치] 중복 할인 알림창 닫기 완료")
                                         alert_found = True
                                         break
                                 if alert_found: break
+                            
+                            if alert_found:
+                                time.sleep(1.0)
+                                clear_input_field(driver)
                         except: pass
                         
                         if alert_found:
-                            mark_as_discounted(log_id, status='not_found')
+                            # 이미 할인이 되어 있으므로 성공(success)으로 간주하여 목록에서 제외
+                            mark_as_discounted(log_id, status='success', entry_time='이미 적용됨')
                             continue
 
                         # --- 상세 매칭 및 입차시간 수집 ---
