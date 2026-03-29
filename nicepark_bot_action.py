@@ -111,10 +111,9 @@ def run_bot():
             driver.execute_script("arguments[0].value = arguments[1];", pw_field, NICEPARK_PW)
             print("   -> 비밀번호 입력 완료")
             
-            # 3. 로그인 버튼 클릭
+            # 3. 로그인 버튼 클릭 (정확한 ID 적용)
             print("   -> 로그인 버튼 클릭 중...")
-            # LOGIN 텍스트를 가진 버튼 또는 링크 탐색
-            login_btn = driver.find_element(By.XPATH, "//*[text()='LOGIN' or text()='로그인']")
+            login_btn = driver.find_element(By.ID, "mf_wfm_body_btn_login")
             driver.execute_script("arguments[0].click();", login_btn)
             
             # 4. 로그인 결과 대기 (조회 버튼 등장 확인)
