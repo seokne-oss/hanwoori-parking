@@ -243,18 +243,22 @@ def process_log(log_id):
 
     log = ParkingLog.query.get_or_404(log_id)
     
-    # 추가: 할인 시간을 명시적으로 요청한 경우 (어드민에서 3h, 6h, 24h 등 선택)
-    requested_hours = request.json.get('stay_hours') if request.is_json else request.form.get('stay_hours')
-    
-    if requested_hours:
-        log.stay_hours = requested_hours
-        log.is_processed = True # 명시적 시간 선택 시 처리 완료로 간주
+    # '확인 중', '완료', '확인 안됨' 그룹에서 호출된 경우 -> '미확인(봉사자 확인 전)' 상태로 완전 초기화
+    if log.is_processed:
+        # 모든 처리 상태를 초기화하여 '미확인 항목' 섹션으로 되돌림
+        log.is_processed = False
+        log.is_discounted = False
+        log.entry_time = None
+        # 실패 메모 제거
+        if log.remarks:
+            log.remarks = log.remarks.replace("[차량번호 확인 안됨]", "").strip()
+        print(f"   [초기화] {log.car_number} 항목을 '미확인' 상태로 완전 되돌림")
     else:
-        # 기존: is_processed 상태를 반전시킴 (True -> False, False -> True)
-        log.is_processed = not log.is_processed
+        # 미확인 항목에서 '확인'을 누른 경우 -> 승인(is_processed=True)
+        log.is_processed = True
     
     db.session.commit()
-    return {'status': 'success', 'is_processed': log.is_processed, 'stay_hours': log.stay_hours}
+    return {'status': 'success', 'is_processed': log.is_processed, 'is_discounted': log.is_discounted}
 
 # 4-1. 설정 변경 API
 @app.route('/admin/update_setting', methods=['POST'])
@@ -305,25 +309,31 @@ def create_test_data():
 
     try:
         kst = timezone(timedelta(hours=9))
-        today_start = datetime.combine(datetime.now(kst).date(), time.min)
+        now = datetime.now(kst)
         
-        today_logs = ParkingLog.query.filter(ParkingLog.created_at >= today_start).all()
+        # 봇이 처리하기 전인 '미승인(is_processed=False)' 상태의 테스트 데이터 5건 생성
+        test_cars = [
+            ("홍길동", "010-1234-5678", "12가 3456", "3시간"),
+            ("성춘향", "010-2222-3333", "123하 4567", "6시간"),
+            ("이몽룡", "010-5555-6666", "서울12 가 1234", "2시간"),
+            ("임꺽정", "010-9999-8888", "55오 5555", "3시간"),
+            ("심청이", "010-1111-0000", "99가 9999", "3시간")
+        ]
 
-        if not today_logs:
-            flash('복사할 오늘 데이터가 없습니다. 먼저 오늘 데이터를 몇 개 등록해주세요.', 'warning')
-            return redirect(url_for('admin'))
-
-        yesterday = datetime.now(kst) - timedelta(days=1)
-        day_before = datetime.now(kst) - timedelta(days=2)
-
-        for log in today_logs:
-            # 어제 날짜로 데이터 복사
-            db.session.add(ParkingLog(name=log.name, phone=log.phone, car_number=log.car_number, stay_hours=log.stay_hours, remarks=log.remarks, is_processed=log.is_processed, created_at=yesterday))
-            # 그제 날짜로 데이터 복사
-            db.session.add(ParkingLog(name=log.name, phone=log.phone, car_number=log.car_number, stay_hours=log.stay_hours, remarks=log.remarks, is_processed=log.is_processed, created_at=day_before))
+        for name, phone, car, hours in test_cars:
+            new_log = ParkingLog(
+                name=name, 
+                phone=phone, 
+                car_number=car, 
+                stay_hours=hours, 
+                is_processed=False, # 미승인 상태
+                is_discounted=False,
+                created_at=now
+            )
+            db.session.add(new_log)
         
         db.session.commit()
-        flash(f'테스트용 과거 데이터 {len(today_logs) * 2}건이 생성되었습니다.', 'success')
+        flash(f'미승인 상태의 테스트 데이터 {len(test_cars)}건이 생성되었습니다.', 'success')
 
     except Exception as e:
         db.session.rollback()

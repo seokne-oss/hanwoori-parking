@@ -30,13 +30,22 @@ NICEPARK_PW = os.environ.get("NICEPARK_PW")
 # GitHub Action 버전은 항상 헤드리스로 실행되며 자동 로그인을 시도합니다.
 
 def clear_input_field(driver):
-    """차량번호 입력 필드를 백스페이스 4번으로 초기화합니다."""
+    """차량번호 입력 필드를 가상 키패드의 지우기 버튼을 사용하여 초기화합니다."""
     try:
-        actions = webdriver.ActionChains(driver)
+        # 가상 키패드에서 '한 글자씩 삭제' 버튼을 최대 4번 클릭
+        # XPath: //input[@title='한 글자씩 삭제']
         for _ in range(4):
-            actions.send_keys(Keys.BACKSPACE)
-        actions.perform()
-        print("   [조치] 입력 필드 초기화 완료 (Backspace 4회)")
+            try:
+                # 텍스트와 타이틀 모두 대응하도록 XPATH 강화
+                backspace_btn = driver.find_element(By.XPATH, "//input[@title='한 글자씩 삭제' or contains(@class, 'carNumBtn')]")
+                if backspace_btn.is_displayed():
+                    driver.execute_script("arguments[0].click();", backspace_btn)
+                    time.sleep(0.2)
+                else:
+                    break
+            except:
+                break
+        print("   [조치] 가상 키패드 지우기 버튼을 통해 입력 필드 초기화 완료")
     except Exception as e:
         print(f"   [오류] 입력 필드 초기화 실패: {e}")
 
@@ -111,14 +120,18 @@ def run_bot():
             """, user_field, NICEPARK_ID)
             print("   -> 아이디 동기화 완료")
             
-            # 2. 비밀번호 입력 (JS 주입 + 이벤트 트리거)
+            # 2. 비밀번호 입력 (JS 주입 + 더 강력한 이벤트 트리거)
+            print("   -> 비밀번호 필드 입력 및 강제 동기화 중...")
             pw_field = driver.find_element(By.ID, "mf_wfm_body_sct_password")
             driver.execute_script("""
+                arguments[0].focus();
                 arguments[0].value = arguments[1];
                 arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
                 arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
                 arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
             """, pw_field, NICEPARK_PW)
+            # 확실함을 위해 마지막에 Tab 키 전송 (포커스 이동 유도)
+            pw_field.send_keys(Keys.TAB)
             print("   -> 비밀번호 동기화 완료")
             
             # 3. 로그인 버튼 클릭
@@ -136,10 +149,11 @@ def run_bot():
             # 진단용 스크린샷 저장
             driver.save_screenshot("login_error.png")
             print("[조치] 진단용 스크린샷(login_error.png) 저장 완료")
-            # 현재 페이지의 HTML 소스 일부 출력 (ID/PW 필드 상태 확인용)
+            # 입력 상태 디버깅용 로그
             try:
-                val_id = driver.find_element(By.ID, "user_id").get_attribute("value")
-                print(f"   [상태] 현재 입력된 ID 값: {'존재함' if val_id else '비어있음'}")
+                val_id = driver.find_element(By.ID, "mf_wfm_body_ibx_empCd").get_attribute("value")
+                val_pw = driver.find_element(By.ID, "mf_wfm_body_sct_password").get_attribute("value")
+                print(f"   [상태] ID 필드: {'채워짐' if val_id else '비어있음'}, PW 필드: {'채워짐' if val_pw else '비어있음'}")
             except: pass
             return
         
@@ -162,57 +176,79 @@ def run_bot():
                         # 4자리 추출 (검색용)
                         last_4 = car_number.replace(" ", "")[-4:]
                         
-                        # 번호 입력
+                        # 번호 입력 (가상 키패드 대응)
                         for digit in last_4:
-                            digit_int = int(digit)
-                            uuid_prefix = "mf_wfm_body_wq_uuid_"
-                            uuid_suffix = 140 + (digit_int - 1) * 2 if digit_int != 0 else 158
+                            digit_str = str(digit)
+                            print(f"      - 숫자 {digit_str} 입력 중...")
+                            success = False
                             
+                            # 1. 태그에 상관없이 숫자를 텍스트로 가진 요소 탐색 (가장 확실함)
                             try:
-                                btn = wait.until(EC.element_to_be_clickable((By.ID, f"{uuid_prefix}{uuid_suffix}")))
-                                btn.click()
-                                time.sleep(0.3)
-                            except:
-                                driver.find_element(By.XPATH, f"//a[text()='{digit}']").click()
+                                # 웹스퀘어 가상 키패드 내부에서 해당하는 숫자 텍스트를 가진 요소 클릭
+                                digit_btn = driver.find_element(By.XPATH, f"//div[@id='mf_wfm_body']//*[text()='{digit_str}']")
+                                if digit_btn.is_displayed():
+                                    driver.execute_script("arguments[0].click();", digit_btn)
+                                    success = True
+                                    print(f"      - 숫자 {digit_str} 입력 성공")
+                            except: pass
+                            
+                            # 2. 보조용 ID 기반 (실패 시 대비)
+                            if not success:
+                                try:
+                                    digit_int = int(digit)
+                                    uuid_suffix = 140 + (digit_int - 1) * 2 if digit_int != 0 else 158
+                                    btn = driver.find_element(By.ID, f"mf_wfm_body_wq_uuid_{uuid_suffix}")
+                                    driver.execute_script("arguments[0].click();", btn)
+                                    success = True
+                                except: pass
+                            
+                            time.sleep(0.4)
                         
-                        # 조회 버튼 클릭
-                        wait.until(EC.element_to_be_clickable((By.ID, "mf_wfm_body_wq_uuid_162"))).click()
+                        # 조회 버튼 클릭 (JS 방식으로 가로막힘 방지)
+                        print("      - 조회 버튼 클릭 중...")
+                        search_btn = wait.until(EC.presence_of_element_located((By.ID, "mf_wfm_body_wq_uuid_162")))
+                        driver.execute_script("arguments[0].click();", search_btn)
                         time.sleep(1.5)
                         
-                        # --- 알림창 감지 (중복 할인 등) ---
-                        alert_found = False
+                        # --- 알림창 감지 (중복 할인, 차량 없음 등) ---
+                        alert_type = None # None, 'not_found', 'already_done'
                         try:
-                            # 1. '이미 처리됨' 혹은 '사용매수 제한' 관련 텍스트 확인
+                            # 1. 텍스트 감지
                             page_text = driver.page_source
-                            if "최대 사용매수" in page_text or "이미 사용" in page_text:
+                            if "검색된 차량이 없습니다" in page_text:
+                                print(f"   [알림] 검색 결과가 없습니다. ({car_number})")
+                                alert_type = 'not_found'
+                            elif "최대 사용매수" in page_text or "이미 사용" in page_text:
                                 print(f"   [알림] 이미 할인이 적용된 차량입니다. ({car_number})")
-                                alert_found = True
+                                alert_type = 'already_done'
                             
-                            # 2. 알림창의 [확인] 버튼 탐색 및 클릭
-                            selectors = [
-                                (By.CSS_SELECTOR, "input[id$='_btn_conf']"), # WebSquare 표준 확인 버튼
-                                (By.XPATH, "//input[@value='확인']"),
-                                (By.XPATH, "//*[contains(text(), '확인')]")
-                            ]
-                            for by_type, selector in selectors:
-                                btns = driver.find_elements(by_type, selector)
-                                for btn in btns:
-                                    if btn.is_displayed():
-                                        driver.execute_script("arguments[0].click();", btn)
-                                        print("   [조치] 중복 할인 알림창 닫기 완료")
-                                        alert_found = True
-                                        break
-                                if alert_found: break
-                            
-                            if alert_found:
+                            # 2. 알림창 닫기 및 상태 보고
+                            if alert_type:
+                                selectors = [
+                                    (By.CSS_SELECTOR, "input[id$='_btn_conf']"), 
+                                    (By.XPATH, "//input[@value='확인']"),
+                                    (By.XPATH, "//*[contains(text(), '확인')]")
+                                ]
+                                for by_type, selector in selectors:
+                                    btns = driver.find_elements(by_type, selector)
+                                    for btn in btns:
+                                        if btn.is_displayed():
+                                            driver.execute_script("arguments[0].click();", btn)
+                                            print(f"   [조치] 알림창({alert_type}) 닫기 완료")
+                                            time.sleep(0.5)
+                                            break
+                                    if alert_type: break
+                                
+                                # 상태에 따른 서버 보고
                                 time.sleep(1.0)
                                 clear_input_field(driver)
+                                
+                                if alert_type == 'not_found':
+                                    mark_as_discounted(log_id, status='not_found')
+                                else:
+                                    mark_as_discounted(log_id, status='success', entry_time='이미 적용됨')
+                                continue
                         except: pass
-                        
-                        if alert_found:
-                            # 이미 할인이 되어 있으므로 성공(success)으로 간주하여 목록에서 제외
-                            mark_as_discounted(log_id, status='success', entry_time='이미 적용됨')
-                            continue
 
                         # --- 상세 매칭 및 입차시간 수집 ---
                         entry_time = None
