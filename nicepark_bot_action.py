@@ -100,29 +100,37 @@ def run_bot():
 
         print(f"[진행] 자동 로그인 시도 중... (ID: {NICEPARK_ID[:3]}***)")
         try:
-            # 입력 필드 대기 및 값 입력
-            user_field = wait.until(EC.presence_of_element_located((By.ID, "user_id")))
-            user_field.clear()
-            user_field.send_keys(NICEPARK_ID)
+            # 1. 아이디 입력 (JS 방식으로 확실하게 주입)
+            print("   -> 아이디 필드 대기 중...")
+            user_field = wait.until(EC.visibility_of_element_located((By.ID, "user_id")))
+            driver.execute_script("arguments[0].value = arguments[1];", user_field, NICEPARK_ID)
+            print("   -> 아이디 입력 완료")
             
+            # 2. 비밀번호 입력 (JS 방식으로 확실하게 주입)
             pw_field = driver.find_element(By.ID, "user_pw")
-            pw_field.clear()
-            pw_field.send_keys(NICEPARK_PW)
+            driver.execute_script("arguments[0].value = arguments[1];", pw_field, NICEPARK_PW)
+            print("   -> 비밀번호 입력 완료")
             
-            # 로그인 버튼 클릭 (JS 방식으로 안정성 확보)
+            # 3. 로그인 버튼 클릭
+            print("   -> 로그인 버튼 클릭 중...")
             login_btn = driver.find_element(By.ID, "btn_login")
             driver.execute_script("arguments[0].click();", login_btn)
-            time.sleep(3)
             
-            # 로그인 후 메인 페이지 또는 할인 등록 페이지로 이동했는지 확인
-            # '조회' 버튼이 있는지 확인하여 로그인 성공 여부 판단
+            # 4. 로그인 결과 대기 (조회 버튼 등장 확인)
+            print("   -> 로그인 처리 대기 중 (최대 20초)...")
             wait.until(EC.presence_of_element_located((By.ID, "mf_wfm_body_wq_uuid_162")))
             print("[확인] 자동 로그인 성공 및 할인 페이지 진입!")
+            
         except Exception as e:
-            print(f"[에러] 자동 로그인 실패 또는 페이지 진입 불가: {e}")
-            # 진단용 스크린샷 저장 (GHA Artifact로 업로드 예정)
+            print(f"[에러] 단계별 진행 중 오류 발생: {e}")
+            # 진단용 스크린샷 저장
             driver.save_screenshot("login_error.png")
             print("[조치] 진단용 스크린샷(login_error.png) 저장 완료")
+            # 현재 페이지의 HTML 소스 일부 출력 (ID/PW 필드 상태 확인용)
+            try:
+                val_id = driver.find_element(By.ID, "user_id").get_attribute("value")
+                print(f"   [상태] 현재 입력된 ID 값: {'존재함' if val_id else '비어있음'}")
+            except: pass
             return
         
         while True:
