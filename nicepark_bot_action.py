@@ -20,10 +20,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- 설정 및 환경 변수 ---
-FLASK_SERVER_URL = os.environ.get("FLASK_SERVER_URL", "http://127.0.0.1:5000")
+FLASK_SERVER_URL = os.environ.get("FLASK_SERVER_URL", "https://hanwoori-parking.up.railway.app")
 RUN_ONCE = os.environ.get("RUN_ONCE", "true").lower() == "true"
 NICEPARK_ID = os.environ.get("NICEPARK_ID")
 NICEPARK_PW = os.environ.get("NICEPARK_PW")
@@ -32,11 +33,8 @@ NICEPARK_PW = os.environ.get("NICEPARK_PW")
 def clear_input_field(driver):
     """차량번호 입력 필드를 가상 키패드의 지우기 버튼을 사용하여 초기화합니다."""
     try:
-        # 가상 키패드에서 '한 글자씩 삭제' 버튼을 최대 4번 클릭
-        # XPath: //input[@title='한 글자씩 삭제']
         for _ in range(4):
             try:
-                # 텍스트와 타이틀 모두 대응하도록 XPATH 강화
                 backspace_btn = driver.find_element(By.XPATH, "//input[@title='한 글자씩 삭제' or contains(@class, 'carNumBtn')]")
                 if backspace_btn.is_displayed():
                     driver.execute_script("arguments[0].click();", backspace_btn)
@@ -48,6 +46,115 @@ def clear_input_field(driver):
         print("   [조치] 가상 키패드 지우기 버튼을 통해 입력 필드 초기화 완료")
     except Exception as e:
         print(f"   [오류] 입력 필드 초기화 실패: {e}")
+
+def click_yes_button(driver, timeout=3):
+    """WebSquare 커스텀 팝업의 '예' 버튼을 방해 요소 제거 후 다각도로 클릭 시도합니다."""
+    try:
+        # 1. 클릭 방해 요소(오버레이, 로딩바) 강제 숨김
+        overlays = ["_modal", "__modal", "___processbar2", "___processbar2_1"]
+        for ov_id in overlays:
+            try:
+                driver.execute_script(f"if(document.getElementById('{ov_id}')) document.getElementById('{ov_id}').style.display='none';")
+                driver.execute_script(f"if(document.getElementById('{ov_id}')) document.getElementById('{ov_id}').style.visibility='hidden';")
+            except: pass
+            
+        # 2. 버튼 탐색용 셀렉터 (사용자 캡처 정보 적극 반영)
+        yes_selectors = [
+            (By.CSS_SELECTOR, "input[id*='_confirm'][id*='_btn_yes']"),
+            (By.XPATH, "//input[contains(@class, 'btn_cm') and contains(@value, '예')]"),
+            (By.XPATH, "//*[contains(@class, 'w2window')]//input[contains(@value, '예')]"),
+            (By.CSS_SELECTOR, "input[id*='_btn_yes']"),
+            (By.CSS_SELECTOR, ".btn_cm.pt"),
+        ]
+        
+        # 3. 버튼 탐색 및 클릭 시도
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            for b_type, sel in yes_selectors:
+                try:
+                    btns = driver.find_elements(b_type, sel)
+                    for btn in btns:
+                        if btn.is_displayed():
+                            # 방법 A: JS 클릭 (오버레이 무시 가능)
+                            try: driver.execute_script("arguments[0].click();", btn)
+                            except: pass
+                            
+                            # 방법 B: 일반 클릭
+                            try: btn.click()
+                            except: pass
+                            
+                            # 방법 C: 엔터키 입력
+                            try: btn.send_keys(Keys.ENTER)
+                            except: pass
+                            
+                            print(f"   [팝업] '예' 버튼 클릭 시도 완료 ({sel})")
+                            return True
+                except: continue
+            time.sleep(0.5)
+            
+    except Exception as e:
+        print(f"   [주의] '예' 버튼 처리 중 오류: {e}")
+    return False
+
+def get_current_applied_discount(driver):
+    """현재 적용된 할인 내역 텍스트를 파싱하여 반환합니다."""
+    try:
+        # 방법 1: 고유 ID 요소 확인 (예: 6시간 (360분))
+        try:
+            summary = driver.find_element(By.ID, "mf_wfm_body_invokedTkSpan")
+            text = summary.text.strip()
+            if text:
+                return text
+        except: pass
+                
+        # 방법 2: w2group apply_ticket_item 안의 텍스트 확인 (fallback)
+        items = driver.find_elements(By.CSS_SELECTOR, ".apply_ticket_item")
+        if items:
+            return " ".join([item.text for item in items if item.is_displayed()])
+    except Exception as e:
+        print(f"   [검증] 적용된 할인 읽기 오류: {e}")
+    return ""
+
+
+def cancel_existing_discount(driver, wait):
+    """나이스파크에서 한우리교회 할인권 1건을 취소합니다. (시간 수정 재처리 시 사용)"""
+    try:
+        print("   [재처리] 기존 할인권 취소 시도...")
+        # '적용된 할인권' 섹션 내 '전체 취소' 버튼 탐색
+        cancel_selectors = [
+            (By.CSS_SELECTOR, "input.apply_ticket_alldel"),
+            (By.XPATH, "//input[@value='전체 취소']"),
+            (By.XPATH, "//*[contains(text(), '전체 취소')]"),
+        ]
+        cancelled = False
+        for by_type, selector in cancel_selectors:
+            btns = driver.find_elements(by_type, selector)
+            for btn in btns:
+                if btn.is_displayed():
+                    driver.execute_script("arguments[0].click();", btn)
+                    time.sleep(1.0)
+                    # 팝업 확인 처리 (네이티브 alert 또는 DOM 모달)
+                    try:
+                        alert = driver.switch_to.alert
+                        alert.accept()
+                        time.sleep(0.5)
+                    except:
+                        # 커스텀 DOM 모달 대응 ("예" 버튼 클릭)
+                        if click_yes_button(driver):
+                            print("   [재처리] 팝업 '예' 버튼 처리 성공")
+                        
+                        print("   [재처리] 기존 할인권 전체 취소 명령 전달 완료")
+                        cancelled = True
+                        break
+                if cancelled: break
+        
+        if not cancelled:
+            print("   [재처리] 취소 버튼 없음 (기존 할인 없는 상태이거나 이미 초기화됨)")
+        return cancelled
+    except Exception as e:
+        print(f"   [재처리] 취소 중 오류: {e}")
+        return False
+
 
 def get_pending_discounts():
     """서버로부터 처리 대기 중인 할인 항목을 가져옵니다."""
@@ -169,8 +276,10 @@ def run_bot():
                     log_id = item['id']
                     car_number = item['car_number']
                     stay_hours = item['stay_hours']
+                    is_retry = item.get('is_retry', False)  # 시간 수정 후 재처리 여부
                     
-                    print(f"   [진행] {car_number} ({stay_hours}) 처리 중...")
+                    retry_label = "[재처리]" if is_retry else "[최초]"
+                    print(f"   [진행] {retry_label} {car_number} ({stay_hours}) 처리 중...")
                     
                     try:
                         # 4자리 추출 (검색용)
@@ -209,7 +318,8 @@ def run_bot():
                         search_btn = wait.until(EC.presence_of_element_located((By.ID, "mf_wfm_body_wq_uuid_162")))
                         driver.execute_script("arguments[0].click();", search_btn)
                         time.sleep(1.5)
-                        
+
+
                         # --- 알림창 감지 (중복 할인, 차량 없음 등) ---
                         alert_type = None # None, 'not_found', 'already_done'
                         try:
@@ -372,20 +482,60 @@ def run_bot():
                             # 3. [즉시] 검색 결과가 단 하나여서 정보가 바로 노출된 경우
                             if not matched:
                                 try:
-                                    # 상세 정보(입차시간 등)가 실제로 화면에 출력되었는지 확인
                                     detail_elements = driver.find_elements(By.XPATH, "//*[contains(text(), '입차시간')]")
                                     if any(d.is_displayed() for d in detail_elements):
-                                        page_text = driver.page_source
-                                        if car_number.replace(" ", "") in page_text.replace(" ", ""):
-                                            print(f"   [매칭] 단일 결과 즉시 매칭 성공 (상세 정보 확인)")
+                                        car_number_clean = car_number.replace(" ", "")
+                                        car_verified = False
+
+                                        # 방법1: 나이스파크 차량번호 td (data-title 속성)
+                                        try:
+                                            car_td = driver.find_element(By.XPATH, "//td[@data-title='차량번호']")
+                                            shown_car = car_td.text.replace(" ", "")
+                                            print(f"   [검증] 화면 차량번호: '{shown_car}' / 등록: '{car_number_clean}'")
+                                            if car_number_clean in shown_car or shown_car in car_number_clean:
+                                                car_verified = True
+                                        except: pass
+
+                                        # 방법2: 입력창(mf_wfm_body_carNoText) 값 확인
+                                        if not car_verified:
+                                            try:
+                                                car_inp = driver.find_element(By.ID, "mf_wfm_body_carNoText")
+                                                input_val = car_inp.get_attribute("value").replace(" ", "")
+                                                print(f"   [검증] 입력창 값: '{input_val}' / 등록: '{car_number_clean}'")
+                                                if input_val and (car_number_clean[-4:] in input_val or input_val[-4:] in car_number_clean):
+                                                    car_verified = True
+                                            except: pass
+
+                                        # 방법3: page_source 뒤 4자리 폴백
+                                        if not car_verified:
+                                            try:
+                                                if car_number_clean[-4:] in driver.page_source.replace(" ", ""):
+                                                    print(f"   [검증] 페이지에서 뒤 4자리({car_number_clean[-4:]}) 확인 → 매칭 허용")
+                                                    car_verified = True
+                                            except: pass
+
+                                        if car_verified:
+                                            print(f"   [매칭] 단일 결과 즉시 매칭 성공")
                                             matched = True
-                                            
-                                            # 입차시간 추출
-                                            time_element = driver.find_element(By.XPATH, "//*[(self::label or self::span) and contains(text(), '입차시간')]/following-sibling::*[1]")
-                                            val = time_element.text.strip()
-                                            if ":" in val:
-                                                entry_time = val.split()[-1]
-                                except: pass
+                                            # 입차시간 추출 (여러 XPath 시도)
+                                            for xpath in [
+                                                "//*[contains(text(),'입차시간')]/following-sibling::*[1]",
+                                                "//td[@data-title='입차시간']",
+                                                "//*[(self::label or self::span) and contains(text(),'입차시간')]/following-sibling::*[1]",
+                                            ]:
+                                                try:
+                                                    for el in driver.find_elements(By.XPATH, xpath):
+                                                        t = el.text.strip()
+                                                        if ':' in t and len(t) >= 5:
+                                                            entry_time = t.split()[-1]
+                                                            print(f"   [정보] 입차시간 추출: {entry_time}")
+                                                            break
+                                                    if entry_time: break
+                                                except: pass
+                                        else:
+                                            print(f"   [실패] 화면 차량번호 '{car_number}'과 불일치")
+                                except Exception as e3:
+                                    print(f"   [주의] 즉시 매칭 처리 중 오류: {e3}")
 
                             if not matched:
                                 print(f"   [실패] 전체 번호 {car_number} 매칭 실패 (차량 선택 불가)")
@@ -397,28 +547,92 @@ def run_bot():
                             mark_as_discounted(log_id, status='not_found')
                             continue
 
-                        # --- 할인권 적용 ---
-                        tk_idx = "1" # 기본 3시간
-                        if "24시간" in stay_hours: tk_idx = "3"
-                        elif "6시간" in stay_hours: tk_idx = "2"
-                        elif "2시간" in stay_hours: tk_idx = "0"
-                        
-                        discount_btn_id = f"mf_wfm_body_gen_dcTkList_{tk_idx}_discountTkGrp"
-                        
+                        # --- 모달 팝업 닫기 (할인 버튼 가리는 경우 대비) ---
                         try:
-                            wait.until(EC.element_to_be_clickable((By.ID, discount_btn_id))).click()
-                            time.sleep(1.0)
-                            try:
-                                alert = driver.switch_to.alert
-                                alert.accept()
-                            except: pass
-                            
+                            modal = driver.find_element(By.ID, "_modal")
+                            if modal.is_displayed():
+                                print("   [조치] _modal 팝업 감지 → JS로 강제 숨김 처리")
+                                driver.execute_script("document.getElementById('_modal').style.display='none';")
+                                time.sleep(0.5)
+                        except: pass
+
+                        # --- 사전 검증 (Pre-check) ---
+                        time.sleep(1.0)
+                        applied_text = get_current_applied_discount(driver)
+                        target_hours = stay_hours.split('(')[0].replace(' ', '') # "6시간"
+                        
+                        # 9시간(종일) 예외 처리
+                        display_target = "24시간" if "9시간" in target_hours else target_hours
+                        
+                        if display_target in applied_text.replace(' ', ''):
+                            print(f"   [검증] 등록하려는 시간({target_hours})과 현재 적용된 할인({applied_text.strip()})이 같으므로 스킵합니다.")
                             if mark_as_discounted(log_id, entry_time=entry_time):
-                                print(f"   [성공] 할인 완료! 입차시간: {entry_time}")
+                                print(f"   [성공] 할인 스킵(기적용 확인)! 입차시간: {entry_time}")
                             else:
                                 print("   [주의] 서버 업데이트 실패")
+                            continue
+                        elif applied_text.strip():
+                            print(f"   [검증] 기존 할인({applied_text.strip()})과 다르므로 기존 할인을 '전체 취소'하고 재적용합니다.")
+                            cancel_existing_discount(driver, wait)
+                            time.sleep(1.0)
+                        elif is_retry:
+                            print(f"   [재처리] 텍스트 확인 불가하나 재처리 플래그 감지 - 예방적 '전체 취소' 시도")
+                            cancel_existing_discount(driver, wait)
+                            time.sleep(1.0)
+
+                        # --- 할인권 적용 ---
+                        # 할인 시간 → 할인권 인덱스 매핑
+                        tk_idx = "1"  # 기본 3시간
+                        if "24시간" in stay_hours: tk_idx = "3"
+                        elif "9시간" in stay_hours: tk_idx = "3"  # 9시간(종일) → 24시간 버튼
+                        elif "6시간" in stay_hours: tk_idx = "2"
+                        elif "2시간" in stay_hours: tk_idx = "0"
+
+                        discount_btn_id = f"mf_wfm_body_gen_dcTkList_{tk_idx}_discountTkGrp"
+                        print(f"   [진행] 할인 버튼 클릭: {discount_btn_id} ({stay_hours})")
+
+                        try:
+                            discount_btn = wait.until(EC.presence_of_element_located((By.ID, discount_btn_id)))
+                            
+                            verified = False
+                            for attempt in range(2): # 기본 1회 + 재시도 1회 = 총 2회
+                                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", discount_btn)
+                                time.sleep(0.3)
+                                driver.execute_script("arguments[0].click();", discount_btn)
+                                time.sleep(1.5)
+                                
+                                try:
+                                    alert = driver.switch_to.alert
+                                    alert.accept()
+                                except:
+                                    # 커스텀 DOM 모달 대응 ("예" 버튼 클릭)
+                                    if click_yes_button(driver):
+                                        print("   [진행] 할인 적용 확인 팝업 처리 완료")
+                                
+                                # --- 사후 검증 (Post-check) ---
+                                time.sleep(1.5)
+                                post_applied_text = get_current_applied_discount(driver)
+                                if display_target in post_applied_text.replace(' ', ''):
+                                    verified = True
+                                    break
+                                else:
+                                    if attempt == 0:
+                                        print(f"   [검증] 적용내역 확인불가 (현재: {post_applied_text.strip()}). 1회 재시도합니다.")
+                                        cancel_existing_discount(driver, wait) # 초기화 후 루프 재시작
+                                        time.sleep(1.0)
+                                    else:
+                                        print(f"   [실패] 재시도 이후에도 윈하는 할인({target_hours}) 적용이 확인되지 않습니다.")
+                            
+                            if verified:
+                                if mark_as_discounted(log_id, entry_time=entry_time):
+                                    print(f"   [성공] 할인 최종 확정! 입차시간: {entry_time}")
+                                else:
+                                    print("   [주의] 서버 업데이트 실패")
+                            else:
+                                mark_as_discounted(log_id, status='failed', entry_time=entry_time)
+
                         except Exception as e:
-                            print(f"   [실패] 할인 버튼 오류: {e}")
+                            print(f"   [실패] 할인 동작 오류: {e}")
                             clear_input_field(driver)
                             mark_as_discounted(log_id, status='not_found')
 

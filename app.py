@@ -26,6 +26,7 @@ class ParkingLog(db.Model):
     car_number = db.Column(db.String(20), nullable=False)
     stay_hours = db.Column(db.String(50), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False)
+    updated_at = db.Column(db.DateTime, nullable=True)  # 시간 수정 시각 기록
     remarks = db.Column(db.String(100), nullable=True)
     is_processed = db.Column(db.Boolean, default=False, nullable=False)
     is_discounted = db.Column(db.Boolean, default=False, nullable=False)
@@ -41,8 +42,11 @@ class ParkingLog(db.Model):
         
         if self.remarks and '[차량번호 확인 안됨]' in self.remarks:
             return {'text': '차량번호 확인 안됨', 'class': 'danger', 'bg': 'danger'}
+            
+        if self.remarks and '[할인적용실패]' in self.remarks:
+            return {'text': '할인적용실패', 'class': 'danger', 'bg': 'danger'}
         
-        return {'text': '차량번호 확인 중', 'class': 'warning', 'bg': 'warning'}
+        return {'text': '할인 접수중', 'class': 'warning', 'bg': 'warning'}
 
 class SystemSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -117,7 +121,6 @@ def index():
         phone = request.form.get('phone')
         car_number = request.form.get('car_number')
         stay_hours = request.form.get('stay_hours')
-        remarks = request.form.get('remarks')
 
         # 간단한 유효성 검사
         if not all([name, phone, car_number, stay_hours]):
@@ -125,7 +128,6 @@ def index():
             return redirect(url_for('index'))
 
         # 차량 번호 유효성 검사 (한국 차량 번호 형식)
-        # 예: 12가 1234, 123가 1234, 서울12 가 1234 등
         car_pattern = re.compile(r'^(\d{2,3}|[가-힣]{2}\d{2})\s?[가-힣]\s?\d{4}$')
         if not car_pattern.match(car_number):
             flash('올바른 차량 번호 형식이 아닙니다. (예: 12가 3456)', 'danger')
@@ -150,14 +152,14 @@ def index():
             phone=phone,
             car_number=car_number,
             stay_hours=stay_hours,
-            remarks=remarks,
-            created_at=datetime.now(timezone(timedelta(hours=9))) # 한국 시간(KST)으로 저장
+            is_processed=True,  # 등록 즉시 봇 대기 상태로 설정
+            created_at=datetime.now(timezone(timedelta(hours=9)))
         )
         db.session.add(new_log)
         db.session.commit()
 
-        flash(f'주차 정보가 성공적으로 등록되었습니다. <a href="{url_for("status", phone=phone)}" class="alert-link">내 등록 현황 확인하기</a>', 'success')
-        return redirect(url_for('index'))
+        # 등록 즉시 주차 현황 페이지로 이동
+        return redirect(url_for('status', phone=phone))
 
     return render_template('index.html')
 
@@ -365,33 +367,30 @@ def delete_all_data():
 
 @app.route('/api/pending-discounts', methods=['GET'])
 def get_pending_discounts():
-    # 처리 완료되었으나 할인은 아직 적용되지 않은 오늘/최근 기록 조회
     kst = timezone(timedelta(hours=9))
     one_day_ago = datetime.now(kst) - timedelta(days=1)
     
-    # 봉사자가 '확인'을 눌렀고(is_processed), 아직 할인 전이며(is_discounted=False), 
-    # 차량번호 미확인 오류([차량번호 확인 안됨])가 없는 '확인 중' 상태의 데이터만 조회
     pending = ParkingLog.query.filter(
         ParkingLog.is_processed == True,
         ParkingLog.is_discounted == False,
         (ParkingLog.remarks == None) | (~ParkingLog.remarks.contains('[차량번호 확인 안됨]')),
         ParkingLog.created_at >= one_day_ago
-    ).all()
+    ).order_by(ParkingLog.updated_at.desc().nullslast(), ParkingLog.created_at.asc()).all()
     
     return {
         'count': len(pending),
         'items': [{
             'id': p.id,
             'car_number': p.car_number,
-            'full_car_number': p.car_number, # 호환성을 위해 추가
+            'full_car_number': p.car_number,
             'stay_hours': p.stay_hours,
-            'name': p.name
+            'name': p.name,
+            'is_retry': p.entry_time is not None  # 이전에 입차시간이 있으면 재처리
         } for p in pending]
     }
 
 @app.route('/api/mark-discounted/<int:log_id>', methods=['POST'])
 def mark_discounted(log_id):
-    # JSON 바디 또는 폼 데이터에서 정보 추출
     data = request.json if request.is_json else request.form
     status = data.get('status', 'success')
     entry_time = data.get('entry_time')
@@ -400,6 +399,10 @@ def mark_discounted(log_id):
     if status == 'not_found':
         log.is_discounted = False
         log.remarks = (log.remarks + " [차량번호 확인 안됨]") if log.remarks else "[차량번호 확인 안됨]"
+    elif status == 'failed':
+        log.is_discounted = False
+        if not log.remarks or '[할인적용실패]' not in log.remarks:
+            log.remarks = (log.remarks + " [할인적용실패]") if log.remarks else "[할인적용실패]"
     else:
         log.is_discounted = True
         if entry_time:
@@ -407,6 +410,91 @@ def mark_discounted(log_id):
         
     db.session.commit()
     return {'status': 'success', 'log_id': log_id, 'result': status, 'entry_time': log.entry_time}
+
+
+# 사용자 시간 수정 API
+@app.route('/api/update-hours/<int:log_id>', methods=['POST'])
+def update_hours(log_id):
+    data = request.json if request.is_json else request.form
+    new_hours = data.get('stay_hours')
+    phone = data.get('phone')  # 소유자 확인용
+
+    if not new_hours:
+        return {'status': 'error', 'message': '시간이 지정되지 않았습니다.'}, 400
+
+    log = ParkingLog.query.get_or_404(log_id)
+
+    if phone and log.phone != phone:
+        return {'status': 'error', 'message': '본인 확인 실패'}, 403
+
+    kst = timezone(timedelta(hours=9))
+    was_discounted = log.is_discounted  # 기존 완료 여부 저장
+    log.stay_hours = new_hours
+    log.is_discounted = False
+    log.updated_at = datetime.now(kst)
+
+    if was_discounted:
+        # ★ 주차처리완료 이후 시간 변경
+        # entry_time 유지 → is_retry=True → 봇이 기존 할인 취소 후 재등록
+        pass
+    else:
+        # 처리 전 시간 변경: 최초 등록처럼 초기화
+        log.entry_time = None
+        if log.remarks:
+            log.remarks = log.remarks.replace('[차량번호 확인 안됨]', '').replace('[할인적용실패]', '').replace('  ', ' ').strip() or None
+
+    db.session.commit()
+    return {'status': 'success', 'stay_hours': log.stay_hours, 'log_id': log_id, 'was_discounted': was_discounted}
+
+
+# 차량번호 수정 API (미완료 상태에서만 가능)
+@app.route('/api/update-car/<int:log_id>', methods=['POST'])
+def update_car(log_id):
+    data = request.json if request.is_json else request.form
+    new_car = data.get('car_number', '').strip()
+    phone = data.get('phone')
+
+    if not new_car:
+        return {'status': 'error', 'message': '차량번호를 입력해주세요.'}, 400
+
+    log = ParkingLog.query.get_or_404(log_id)
+
+    if phone and log.phone != phone:
+        return {'status': 'error', 'message': '본인 확인 실패'}, 403
+
+    # 주차처리완료 상태에서는 차량번호 변경 불가
+    if log.is_discounted:
+        return {'status': 'error', 'message': '이미 처리 완료된 건은 차량번호를 변경할 수 없습니다.'}, 403
+
+    car_pattern = re.compile(r'^(\d{2,3}|[가-힣]{2}\d{2})\s?[가-힣]\s?\d{4}$')
+    if not car_pattern.match(new_car):
+        return {'status': 'error', 'message': '올바른 차량번호 형식이 아닙니다. (예: 12가 3456)'}, 400
+
+    kst = timezone(timedelta(hours=9))
+    log.car_number = new_car
+    log.updated_at = datetime.now(kst)
+    # 에러 상태 초기화 → 봇 재시도 유도
+    if log.remarks:
+        log.remarks = log.remarks.replace('[차량번호 확인 안됨]', '').replace('[할인적용실패]', '').replace('  ', ' ').strip() or None
+    db.session.commit()
+
+    return {'status': 'success', 'car_number': log.car_number, 'log_id': log_id}
+
+
+# 실시간 상태 폴링용 API
+@app.route('/api/status/<int:log_id>', methods=['GET'])
+def get_log_status(log_id):
+    log = ParkingLog.query.get_or_404(log_id)
+    status = log.get_status()
+    return {
+        'id': log.id,
+        'is_discounted': log.is_discounted,
+        'is_processed': log.is_processed,
+        'entry_time': log.entry_time,
+        'stay_hours': log.stay_hours,
+        'status_text': status['text'],
+        'status_class': status['class']
+    }
 
 
 # --- 애플리케이션 실행 ---
