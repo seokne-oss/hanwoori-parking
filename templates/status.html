@@ -1,211 +1,179 @@
 <!-- templates/status.html -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>주차 등록 현황 확인</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        :root { --hanwoori-green: #006a4e; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; }
-        .main-container {
-            background-color: #ffffff; border-radius: 12px; padding: 2rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-top: 2rem; max-width: 600px;
-        }
-        .btn-primary { background-color: var(--hanwoori-green); border-color: var(--hanwoori-green); }
-        .btn-primary:hover { background-color: #005841; border-color: #005841; }
-        .form-control:focus { border-color: var(--hanwoori-green); box-shadow: 0 0 0 0.25rem rgba(0,106,78,0.25); }
-        .return-link a { color: var(--hanwoori-green); text-decoration: none; font-weight: 500; }
-        .time-btn-group .btn { font-size: 0.85rem; padding: 0.3rem 0.6rem; }
-        .time-btn-group .btn.active-time {
-            background-color: var(--hanwoori-green); color: white; border-color: var(--hanwoori-green);
-        }
-        /* 완료 후 시간 변경 버튼 */
-        .completed-change-btn { font-size:0.8rem; }
-        /* 차량번호 수정 폼 */
-        .car-edit-input:focus { border-color: var(--hanwoori-green); box-shadow: 0 0 0 0.2rem rgba(0,106,78,0.2); }
-        /* 상태 배지 펄스 */
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        .badge-pending { animation: pulse 2s infinite; }
-        /* 완료 후 시간 변경 경고 섹션 */
-        .retry-section { border: 1px solid #ffc107; border-radius:8px; padding: 0.75rem; margin-top:0.5rem; background:#fffdf0; }
+      :root {
+        --hanwoori-green: #006a4e;
+      }
+      body {
+        font-family: "Noto Sans KR", sans-serif;
+        background-color: #f8f9fa;
+      }
+      .main-container {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-top: 2rem;
+        max-width: 600px;
+      }
+      .btn-primary {
+        background-color: var(--hanwoori-green);
+        border-color: var(--hanwoori-green);
+      }
+      .btn-primary:hover {
+        background-color: #005841;
+        border-color: #005841;
+      }
+      .form-control:focus {
+        border-color: var(--hanwoori-green);
+        box-shadow: 0 0 0 0.25rem rgba(0, 106, 78, 0.25);
+      }
+      .return-link a {
+        color: var(--hanwoori-green);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .time-btn-group .btn {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.6rem;
+      }
+      .time-btn-group .btn.active-time {
+        background-color: var(--hanwoori-green);
+        color: white;
+        border-color: var(--hanwoori-green);
+      }
+      /* 완료 후 시간 변경 배지 */
+      .badge-pending {
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container main-container">
-        <div class="text-center mb-4">
-            <a href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='IMG/CI_home.png') }}" alt="한우리교회 로고" style="width: 100px; height: auto;">
-            </a>
-            <h1 class="h3 mt-2">주차 등록 현황 확인</h1>
-        </div>
+      <div class="text-center mb-4">
+        <a href="{{ url_for('index') }}">
+          <img src="https://www.hanwoori.or.kr/theme/basic/img/logo.png" alt="한우리교회 로고" style="max-height: 40px; margin-bottom: 10px;">
+        </a>
+        <h2 class="fw-bold">주차 등록 현황 확인</h2>
+      </div>
 
-        <div class="card p-4">
-            <form method="GET" action="{{ url_for('status') }}">
-                <div class="mb-3">
-                    <label for="phone" class="form-label">휴대폰 번호</label>
-                    <input type="tel" class="form-control" id="phone" name="phone" placeholder="010-1234-5678" required>
-                </div>
-                <button type="submit" class="btn btn-primary w-100 py-2">조회하기</button>
-            </form>
-        </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              {% if category != 'admin_info' %}
-              <div class="alert alert-{{ category }} mt-4" role="alert">{{ message }}</div>
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        {% if logs %}
-            {% for log in logs %}
-            {% set status = log.get_status() %}
-            <div class="card mt-4" id="log-card-{{ log.id }}">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>{{ log.created_at.strftime('%Y년 %m월 %d일 %H:%M') }} 등록</strong>
-                    <span class="badge bg-{{ status.bg }} rounded-pill {% if not log.is_discounted and log.is_processed %}badge-pending{% endif %}"
-                          id="status-badge-{{ log.id }}">
-                        {% if not log.is_discounted and log.is_processed %}<i class="bi bi-robot me-1"></i>{% endif %}
-                        {{ status.text }}
-                    </span>
-                </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item">이름 <strong class="float-end">{{ log.name }}</strong></li>
-
-                    {# ===== 차량번호 (미완료 시 수정 가능) ===== #}
-                    <li class="list-group-item" id="car-li-{{ log.id }}"
-                        data-log-id="{{ log.id }}" data-phone="{{ log.phone }}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>차량번호</span>
-                            <div class="d-flex align-items-center gap-2">
-                                <strong id="car-display-{{ log.id }}">{{ log.car_number }}</strong>
-                                {% if not log.is_discounted %}
-                                <button type="button" class="btn btn-sm btn-outline-secondary car-edit-toggle py-0 px-1"
-                                        data-log-id="{{ log.id }}" style="font-size:0.75rem;">
-                                    <i class="bi bi-pencil"></i> 수정
-                                </button>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% if not log.is_discounted %}
-                        <div id="car-edit-{{ log.id }}" class="mt-2 d-none">
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control car-edit-input"
-                                       id="car-input-{{ log.id }}" value="{{ log.car_number }}"
-                                       placeholder="예: 12가 3456">
-                                <button type="button" class="btn btn-success car-save-btn" data-log-id="{{ log.id }}">저장</button>
-                                <button type="button" class="btn btn-outline-secondary car-cancel-btn" data-log-id="{{ log.id }}">취소</button>
-                            </div>
-                            <div class="text-muted mt-1" style="font-size:0.72rem;">
-                                <i class="bi bi-exclamation-circle me-1"></i>형식: 12가 3456 (숫자+한글+숫자)
-                            </div>
-                        </div>
-                        {% endif %}
-                    </li>
-
-                    {# ===== 주차 할인 시간 ===== #}
-                    <li class="list-group-item" data-log-id="{{ log.id }}" data-phone="{{ log.phone }}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>주차 할인 시간</span>
-                            <strong id="hours-display-{{ log.id }}">{{ log.stay_hours }}</strong>
-                        </div>
-
-                        {# 시간 버튼 (상태 무관하게 언제든 클릭 가능) #}
-                        <div class="mt-2 time-btn-group d-flex gap-1" id="time-btns-{{ log.id }}"
-                             data-log-id="{{ log.id }}" data-phone="{{ log.phone }}">
-                            <button type="button" class="btn btn-sm btn-outline-secondary flex-fill time-select-btn
-                                    {% if log.stay_hours == '3시간' %}active-time{% endif %}"
-                                    data-hours="3시간">3시간</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary flex-fill time-select-btn
-                                    {% if log.stay_hours == '6시간' %}active-time{% endif %}"
-                                    data-hours="6시간">6시간</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary flex-fill time-select-btn
-                                    {% if log.stay_hours == '9시간' %}active-time{% endif %}"
-                                    data-hours="9시간">9시간(종일)</button>
-                        </div>
-                        {% if log.is_discounted %}
-                        <div class="text-danger mt-1" style="font-size:0.75rem;">
-                            <i class="bi bi-info-circle me-1"></i>시간 변경 시 기존 할인권이 취소되고 재등록됩니다.
-                        </div>
-                        {% elif '확인 안됨' in status.text %}
-                        <div class="text-danger mt-1" style="font-size:0.75rem;">
-                            <i class="bi bi-arrow-clockwise me-1"></i>시간을 변경하면 시스템이 다시 시도합니다.
-                        </div>
-                        {% else %}
-                        <div class="text-muted mt-1" style="font-size:0.75rem;">
-                            <i class="bi bi-info-circle me-1"></i>처리 전까지 자유롭게 시간을 변경할 수 있습니다.
-                        </div>
-                        {% endif %}
-                    </li>
-
-                    {# 입차 시간 표시 (완료 시) #}
-                    {% if log.entry_time and log.is_discounted %}
-                    <li class="list-group-item" id="entry-time-li-{{ log.id }}">
-                        <div class="small text-primary text-center">
-                            <i class="bi bi-clock-history me-1"></i>입차: {{ log.entry_time }}
-                            <br>
-                            {% set entry_h = log.entry_time.split(':')[0] | int %}
-                            {% set entry_m = log.entry_time.split(':')[1] | int %}
-                            {% set disc_h = 3 %}
-                            {% if '9시간' in log.stay_hours %}{% set disc_h = 9 %}
-                            {% elif '6시간' in log.stay_hours %}{% set disc_h = 6 %}
-                            {% elif '24시간' in log.stay_hours %}{% set disc_h = 24 %}
-                            {% elif '2시간' in log.stay_hours %}{% set disc_h = 2 %}{% endif %}
-                            {% set total_m = entry_h * 60 + entry_m + disc_h * 60 %}
-                            {% set expire_h = (total_m // 60) % 24 %}
-                            {% set expire_m = total_m % 60 %}
-                            <strong>({{ "%02d"|format(expire_h) }}시 {{ "%02d"|format(expire_m) }}분까지 {{ disc_h }}시간 할인)</strong>
-                        </div>
-                    </li>
-                    {% endif %}
-                </ul>
-                
-                {# 할인적용실패 얼럿 영역 #}
-                <div id="error-alert-{{ log.id }}" class="mt-3 text-center {% if status.text != '할인적용실패' %}d-none{% endif %}">
-                    <p class="text-danger fw-bold mb-0" style="font-size: 0.9rem;">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>할인 적용에 실패했습니다. 관리자에게 문의해주세요.
-                    </p>
-                </div>
+      <div class="card mb-4">
+        <div class="card-body">
+          <form id="search-form">
+            <div class="mb-3">
+              <label for="phone" class="form-label">휴대폰 번호</label>
+              <input type="tel" class="form-control" id="phone" name="phone" placeholder="010-1234-5678" required>
             </div>
-            {% endfor %}
-        {% endif %}
-
-        <div class="text-center mt-4 return-link">
-            <a href="{{ url_for('index') }}">주차 등록 페이지로 돌아가기</a>
+            <button type="submit" class="btn btn-primary w-100 py-2">조회하기</button>
+          </form>
         </div>
+      </div>
 
-        <!-- 문의 연락처 섹션 -->
-        <div class="mt-5 pt-3 border-top text-center" style="font-size: 0.85rem; color: #666;">
-            <p class="mb-1 fw-bold"><i class="bi bi-telephone-fill me-1"></i> 주차등록 문의 연락처</p>
-            <p class="mb-0">010-2509-1197</p>
-            <p class="mb-1">010-2295-6271</p>
-            <p class="text-muted" style="font-size: 0.75rem;">(문자로 차량번호 포함하여 문의 내용 전송)</p>
-        </div>
+      {% if logs %}
+        {% for log in logs %}
+          {% set status = log.get_status() %}
+          <div class="card mb-3 parking-card overflow-hidden" data-log-id="{{ log.id }}">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+              <span class="text-muted small fw-bold">{{ log.created_at.strftime('%Y년 %m월 %d일 %H:%M') }} 등록</span>
+              <span id="status-badge-{{ log.id }}" class="badge bg-{{ status.class }} rounded-pill {% if not log.is_discounted and log.is_processed %}badge-pending{% endif %}">
+                {% if not log.is_discounted and log.is_processed %}<i class="bi bi-arrow-repeat me-1"></i>{% endif %}
+                {{ status.text }}
+              </span>
+            </div>
+            <div class="card-body py-3">
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                  <span class="text-muted">이름</span>
+                  <span class="fw-bold">{{ log.name }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0" id="car-li-{{ log.id }}" data-log-id="{{ log.id }}">
+                  <span class="text-muted">차량번호</span>
+                  <span class="fw-bold">{{ log.car_number }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0 pb-0 border-0">
+                  <span class="text-muted">주차 할인 시간</span>
+                  <span class="fw-bold" id="hours-display-{{ log.id }}">{{ log.stay_hours }}</span>
+                </li>
+                <li class="list-group-item px-0 pt-1">
+                  <div class="time-btn-group d-flex gap-1" data-log-id="{{ log.id }}" data-phone="{{ log.phone }}">
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill time-select-btn {% if log.stay_hours == '3시간' %}active-time{% endif %}" data-hours="3시간">3시간</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill time-select-btn {% if log.stay_hours == '6시간' %}active-time{% endif %}" data-hours="6시간">6시간</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill time-select-btn {% if log.stay_hours == '9시간' %}active-time{% endif %}" data-hours="9시간">9시간(종일)</button>
+                  </div>
+                  <div class="text-danger mt-1" style="font-size:0.75rem;">
+                    <i class="bi bi-info-circle me-1"></i>시간 변경 시 기존 할인권이 취소되고 재등록됩니다.
+                  </div>
+                </li>
+
+                {# 입차 정보 (서버 사이드 계산) #}
+                {% if log.entry_time and log.is_discounted %}
+                <li class="list-group-item" id="entry-time-li-{{ log.id }}">
+                  <div class="small text-primary text-center">
+                    <i class="bi bi-clock-history me-1"></i>입차: {{ log.entry_time }}
+                    <br>
+                    {% set entry_h = log.entry_time.split(':')[0] | int %}
+                    {% set entry_m = log.entry_time.split(':')[1] | int %}
+                    {% set disc_h = log.stay_hours|replace('시간', '')|replace('(종일)', '')|int if log.stay_hours else 3 %}
+                    {% set total_m = entry_h * 60 + entry_m + disc_h * 60 %}
+                    {% set expire_h = (total_m // 60) % 24 %}
+                    {% set expire_m = total_m % 60 %}
+                    <strong>({{ "%02d"|format(expire_h) }}시 {{ "%02d"|format(expire_m) }}분까지 {{ disc_h }}시간 할인)</strong>
+                  </div>
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <div class="text-center mt-4 return-link">
+        <a href="{{ url_for('index') }}">주차 등록 페이지로 돌아가기</a>
+      </div>
+
+      <div class="mt-5 pt-3 border-top text-center text-muted" style="font-size: 0.85rem;">
+        <p class="mb-1 fw-bold"><i class="bi bi-telephone-fill me-1"></i> 주차등록 문의 연락처</p>
+        <p class="mb-0">010-2509-1197 / 010-2295-6271</p>
+      </div>
     </div>
 
-    <!-- 할인 시간 변경 확인용 Bootstrap Modal -->
-    <div class="modal fade" id="customConfirmModal" tabindex="-1" aria-labelledby="customConfirmModalLabel" aria-hidden="true">
+    <!-- 확인 모달 -->
+    <div class="modal fade" id="customConfirmModal" tabindex="-1">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header bg-warning text-dark">
-            <h5 class="modal-title" id="customConfirmModalLabel"><i class="bi bi-clock-history me-2"></i>할인 시간 변경 확인</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div class="modal-header bg-warning text-dark py-2">
+            <h6 class="modal-title fw-bold">할인 시간 변경</h6>
+            <button type="button" class="btn-close" data-bs-modal="hide"></button>
           </div>
-          <div class="modal-body text-start">
-            <p class="fs-6 mb-2">선택하신 시간: <strong id="modal-hours-text" class="text-primary"></strong></p>
-            <p class="mb-0 fw-bold">할인 시간을 변경하시겠습니까?</p>
+          <div class="modal-body py-3">
+            선택한 시간: <strong id="modal-hours-text" class="text-primary"></strong><br>변경하시겠습니까?
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-            <button type="button" class="btn btn-primary" onclick="executeTimeChange()">확인</button>
+          <div class="modal-footer py-1">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">취소</button>
+            <button type="button" class="btn btn-sm btn-primary" onclick="executeTimeChange()">확인</button>
           </div>
         </div>
       </div>
@@ -213,238 +181,117 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // ── 폴링 설정 ──────────────────────────────────────────
-        const pollingIds = [{% if logs %}{% for log in logs %}{% if not log.is_discounted and log.is_processed %}{{ log.id }},{% endif %}{% endfor %}{% endif %}];
-        const pollingIntervals = {};
+      const pollingIntervals = {};
+      /* Jinja2 변수를 안전하게 JS 데이터로 변환 */
+      const pollingIds = JSON.parse('{{ logs|selectattr("is_discounted", "equalto", false)|map(attribute="id")|list|tojson|safe }}');
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // 전화번호 자동 저장/복원
-            const phoneInput = document.getElementById('phone');
-            const urlParams = new URLSearchParams(window.location.search);
-            const phoneFromUrl = urlParams.get('phone');
-            if (phoneFromUrl) {
-                phoneInput.value = phoneFromUrl;
-                localStorage.setItem('parkingPhone', phoneFromUrl);
-            } else {
-                const saved = localStorage.getItem('parkingPhone');
-                if (saved) phoneInput.value = saved;
-            }
-            phoneInput.addEventListener('input', function(e) {
-                let v = e.target.value.replace(/\D/g, '');
-                if (v.startsWith('010')) {
-                    if (v.length > 3 && v.length <= 7) v = v.slice(0,3)+'-'+v.slice(3);
-                    else if (v.length > 7) v = v.slice(0,3)+'-'+v.slice(3,7)+'-'+v.slice(7,11);
-                }
-                e.target.value = v;
-            });
+      document.addEventListener('DOMContentLoaded', () => {
+        const phoneInput = document.getElementById('phone');
+        const savedPhone = localStorage.getItem('parkingPhone');
+        if (savedPhone) phoneInput.value = savedPhone;
 
-            // 미처리 항목 폴링 시작
-            pollingIds.forEach(id => startPolling(id));
+        document.getElementById('search-form').onsubmit = (e) => {
+          localStorage.setItem('parkingPhone', phoneInput.value);
+        };
 
-            // ── 이벤트 위임 ──────────────────────────────────────
-            document.addEventListener('click', handleAllClicks);
+        pollingIds.forEach(id => startPolling(id));
+        
+        document.querySelectorAll('.time-select-btn').forEach(btn => {
+          btn.onclick = () => {
+             const group = btn.closest('[data-log-id]');
+             showTimeConfirmModal(group.dataset.logId, btn.dataset.hours, group.dataset.phone, btn, group);
+          };
         });
+      });
 
-        // ── 클릭 이벤트 통합 처리 ──────────────────────────────
-        function handleAllClicks(e) {
-            const timeBtn = e.target.closest('.time-select-btn');
-            if (timeBtn) {
-                e.preventDefault();
-                const group = timeBtn.closest('[data-log-id]');
-                if (group) {
-                    showTimeConfirmModal(group.dataset.logId, timeBtn.dataset.hours, group.dataset.phone, timeBtn, group);
-                }
-                return;
-            }
-            const carToggle = e.target.closest('.car-edit-toggle');
-            if (carToggle) { e.preventDefault(); toggleCarEdit(carToggle.dataset.logId); return; }
-            
-            const carSave = e.target.closest('.car-save-btn');
-            if (carSave) {
-                e.preventDefault();
-                const li = document.getElementById(`car-li-${carSave.dataset.logId}`);
-                saveCarNumber(carSave.dataset.logId, li?.dataset.phone); return;
-            }
-            const carCancel = e.target.closest('.car-cancel-btn');
-            if (carCancel) { e.preventDefault(); toggleCarEdit(carCancel.dataset.logId, true); return; }
+      function showTimeConfirmModal(id, hours, phone, btn, group) {
+        window.pendingAction = { id, hours, phone, btn, group };
+        document.getElementById('modal-hours-text').textContent = hours;
+        new bootstrap.Modal(document.getElementById('customConfirmModal')).show();
+      }
+
+      function executeTimeChange() {
+        const { id, hours, phone, btn, group } = window.pendingAction;
+        bootstrap.Modal.getInstance(document.getElementById('customConfirmModal')).hide();
+        updateHours(id, hours, phone, btn, group);
+      }
+
+      async function updateHours(id, hours, phone, btn, group) {
+        // 즉각 피드백: 기존 시간 안내 문구 숨기기
+        const infoLi = document.getElementById(`entry-time-li-${id}`);
+        if (infoLi) infoLi.classList.add('d-none');
+
+        const badge = document.getElementById(`status-badge-${id}`);
+        if (badge) {
+          badge.className = 'badge bg-warning rounded-pill badge-pending';
+          badge.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>재처리 대기중';
         }
 
-        // ── 실시간 폴링 ──────────────────────────────────────────
-        // 페이지 내 어떠한 패널이라도 열려있는지 확인 (상호작용 중 폴링 간섭 방지)
-        function isUserInteracting() {
-            return !!document.querySelector('.retry-section:not(.d-none)');
+        try {
+          const res = await fetch(`/api/update-hours/${id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ stay_hours: hours, phone })
+          });
+          if (res.ok) {
+            group.querySelectorAll('.btn').forEach(b => b.classList.remove('active-time'));
+            btn.classList.add('active-time');
+            document.getElementById(`hours-display-${id}`).textContent = hours;
+            startPolling(parseInt(id));
+          }
+        } catch(e) { console.error(e); }
+      }
+
+      function startPolling(id) {
+        if (pollingIntervals[id]) return;
+        pollingIntervals[id] = setInterval(async () => {
+          try {
+            const res = await fetch(`/api/status/${id}`);
+            const data = await res.json();
+            updateCardStatus(id, data);
+            if (data.is_discounted && data.entry_time) stopPolling(id);
+          } catch(e) { console.error(e); }
+        }, 5000);
+      }
+
+      function stopPolling(id) {
+        clearInterval(pollingIntervals[id]);
+        delete pollingIntervals[id];
+      }
+
+      function updateCardStatus(id, data) {
+        const badge = document.getElementById(`status-badge-${id}`);
+        if (badge) {
+          badge.className = `badge bg-${data.status_class} rounded-pill`;
+          badge.innerHTML = data.is_processed && !data.is_discounted ? `<i class="bi bi-arrow-repeat me-1"></i>${data.status_text}` : data.status_text;
         }
-
-        function startPolling(logId) {
-            // 이미 폴링 중이면 방어
-            if (pollingIntervals[logId]) return;
-            
-            // "주차처리완료" 항목은 실시간 업데이트 완전 차단 (사용자 요청 반영)
-            const badge = document.getElementById(`status-badge-${logId}`);
-            if (badge && badge.textContent.includes('주차처리완료')) {
-                return; // 최초부터 폴링 시작 안함
-            }
-
-            pollingIntervals[logId] = setInterval(async function() {
-                // 상호작용 중이면 해당 턴 스킵
-                if (isUserInteracting()) return;
-
-                try {
-                    const res = await fetch(`/api/status/${logId}`);
-                    if (!res.ok) throw new Error('API Error');
-                    const data = await res.json();
-                    
-                    // 주차처리완료 상태 도달 시: 즉시 폴링 영구 종료하여 간섭 원천 차단!
-                    if (data.is_discounted) {
-                        stopPolling(logId);
-                    }
-                    
-                    // UI 상태 반영
-                    updateCardStatus(logId, data);
-                } catch(e) { console.warn('폴링 오류:', e); }
-            }, 5000);
+        
+        const infoLi = document.getElementById(`entry-time-li-${id}`);
+        if (data.is_discounted && data.entry_time) {
+          const h = parseInt(data.entry_time.split(':')[0]);
+          const m = parseInt(data.entry_time.split(':')[1]);
+          const d = parseInt(data.stay_hours) || 3;
+          const totalM = h * 60 + m + d * 60;
+          const exH = Math.floor(totalM / 60) % 24;
+          const exM = totalM % 60;
+          const exStr = `${String(exH).padStart(2, '0')}시 ${String(exM).padStart(2, '0')}분`;
+          
+          const content = `<div class="small text-primary text-center"><i class="bi bi-clock-history me-1"></i>입차: ${data.entry_time}<br><strong>(${exStr}까지 ${d}시간 할인)</strong></div>`;
+          
+          if (!infoLi) {
+            const li = document.createElement('li');
+            li.id = `entry-time-li-${id}`;
+            li.className = 'list-group-item';
+            li.innerHTML = content;
+            document.querySelector(`[data-log-id="${id}"] .list-group`).appendChild(li);
+          } else {
+            infoLi.classList.remove('d-none');
+            infoLi.innerHTML = content;
+          }
+        } else if (infoLi) {
+          infoLi.classList.add('d-none');
         }
-
-        function stopPolling(logId) {
-            if (pollingIntervals[logId]) {
-                clearInterval(pollingIntervals[logId]);
-                delete pollingIntervals[logId];
-            }
-        }
-
-        function updateCardStatus(logId, data) {
-            const badge = document.getElementById(`status-badge-${logId}`);
-            const hoursDisplay = document.getElementById(`hours-display-${logId}`);
-            const timeBtns = document.getElementById(`time-btns-${logId}`);
-            const carLi = document.getElementById(`car-li-${logId}`);
-            const errorAlert = document.getElementById(`error-alert-${logId}`);
-
-            if (badge) {
-                const newClass = `badge bg-${data.status_class} rounded-pill`;
-                if (badge.className !== newClass) badge.className = newClass;
-                
-                const newContent = (data.status_text === '할인적용실패' || data.is_discounted) 
-                    ? data.status_text 
-                    : `<i class="bi bi-arrow-repeat me-1"></i>${data.status_text}`;
-                if (badge.innerHTML !== newContent) badge.innerHTML = newContent;
-            }
-            if (hoursDisplay && hoursDisplay.textContent !== data.stay_hours) {
-                hoursDisplay.textContent = data.stay_hours;
-            }
-            
-            // 할인적용실패 경고 메시지 토글
-            if (errorAlert) {
-                if (data.status_text === '할인적용실패') {
-                    errorAlert.classList.remove('d-none');
-                } else {
-                    errorAlert.classList.add('d-none');
-                }
-            }
-
-            // 완료 시 차량번호 수정 버튼 제거 (실패 상태일 때는 원상복구 혹은 유지)
-            if (data.is_discounted && carLi) {
-                const editBtn = carLi.querySelector('.car-edit-toggle');
-                if (editBtn) editBtn.remove();
-            }
-        }
-
-        // ── 시간 수정 모달 제어 및 실행 (미완료/완료 모두 공통 사용) ────────────────────────
-        let pendingTimeChange = null;
-
-        function showTimeConfirmModal(logId, newHours, phone, clickedBtn, group) {
-            pendingTimeChange = { logId, newHours, phone, clickedBtn, group };
-            
-            const modalEl = document.getElementById('customConfirmModal');
-            document.getElementById('modal-hours-text').textContent = newHours;
-            
-            const modal = new bootstrap.Modal(modalEl);
-            modal.show();
-        }
-
-        function executeTimeChange() {
-            if (!pendingTimeChange) return;
-            const { logId, newHours, phone, clickedBtn, group } = pendingTimeChange;
-            pendingTimeChange = null;
-
-            // 모달 닫기 (취소 누르거나 작업 시작 시 직전 화면으로 돌아가는 효과)
-            const modalEl = document.getElementById('customConfirmModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-
-            // 백그라운드 폴링 간섭 방지(혹시 몰라 interval 초기화)
-            if (pollingIntervals[logId]) {
-                clearInterval(pollingIntervals[logId]);
-                delete pollingIntervals[logId];
-            }
-
-            // 실제 시간 업데이트 실행
-            updateHours(logId, newHours, phone, clickedBtn, group);
-        }
-
-        async function updateHours(logId, newHours, phone, clickedBtn, group) {
-            try {
-                const res = await fetch(`/api/update-hours/${logId}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ stay_hours: newHours, phone: phone })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    if (group) {
-                        group.querySelectorAll('.time-select-btn').forEach(b => b.classList.remove('active-time'));
-                        if (clickedBtn) clickedBtn.classList.add('active-time');
-                    }
-                    const display = document.getElementById(`hours-display-${logId}`);
-                    if (display) display.textContent = newHours;
-                    
-                    // 배지 상태를 대기 중으로 임시 변경하여 시각적 피드백 제공
-                    const badge = document.getElementById(`status-badge-${logId}`);
-                    if (badge) {
-                        badge.className = 'badge bg-warning rounded-pill badge-pending';
-                        badge.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>재처리 대기중';
-                    }
-
-                    // 요청 성공 시 폴링 재시작 (봇 작업 완료 감지용)
-                    if (!pollingIntervals[logId]) startPolling(parseInt(logId));
-                    alert(`✅ 변경되었습니다! 시스템이 처리합니다.`);
-                } else {
-                    alert('❌ 변경 실패: ' + (data.message || '알 수 없는 오류'));
-                }
-            } catch(ex) { alert('네트워크 오류가 발생했습니다.'); }
-        }
-
-        // ── 차량번호 수정 ──────────────────────────────────────────
-        function toggleCarEdit(logId, cancel = false) {
-            const editDiv = document.getElementById(`car-edit-${logId}`);
-            if (!editDiv) return;
-            editDiv.classList.toggle('d-none', cancel || !editDiv.classList.contains('d-none'));
-            if (!cancel) document.getElementById(`car-input-${logId}`)?.focus();
-        }
-
-        async function saveCarNumber(logId, phone) {
-            const input = document.getElementById(`car-input-${logId}`);
-            if (!input) return;
-            const newCar = input.value.trim();
-            if (!newCar) { alert('차량번호를 입력해주세요.'); return; }
-            try {
-                const res = await fetch(`/api/update-car/${logId}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ car_number: newCar, phone: phone })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    const display = document.getElementById(`car-display-${logId}`);
-                    if (display) display.textContent = data.car_number;
-                    toggleCarEdit(logId, true);
-                    alert(`✅ 차량번호가 ${data.car_number}으로 변경되었습니다!`);
-                } else {
-                    alert('❌ ' + (data.message || '변경 실패'));
-                }
-            } catch(ex) { alert('네트워크 오류가 발생했습니다.'); }
-        }
-
-
+      }
     </script>
-</body>
+  </body>
 </html>

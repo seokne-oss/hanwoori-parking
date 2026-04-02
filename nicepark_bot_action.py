@@ -24,7 +24,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- 설정 및 환경 변수 ---
-FLASK_SERVER_URL = os.environ.get("FLASK_SERVER_URL", "https://hanwoori-parking.up.railway.app")
+FLASK_SERVER_URL = os.environ.get("FLASK_SERVER_URL", "http://127.0.0.1:5000")
 RUN_ONCE = os.environ.get("RUN_ONCE", "true").lower() == "true"
 NICEPARK_ID = os.environ.get("NICEPARK_ID")
 NICEPARK_PW = os.environ.get("NICEPARK_PW")
@@ -61,10 +61,11 @@ def click_yes_button(driver, timeout=3):
         # 2. 버튼 탐색용 셀렉터 (사용자 캡처 정보 적극 반영)
         yes_selectors = [
             (By.CSS_SELECTOR, "input[id*='_confirm'][id*='_btn_yes']"),
-            (By.XPATH, "//input[contains(@class, 'btn_cm') and contains(@value, '예')]"),
-            (By.XPATH, "//*[contains(@class, 'w2window')]//input[contains(@value, '예')]"),
-            (By.CSS_SELECTOR, "input[id*='_btn_yes']"),
+            (By.XPATH, "//input[contains(@class, 'btn_cm') and (contains(@value, '예') or contains(@value, '확인'))]"),
+            (By.XPATH, "//*[contains(@class, 'w2window')]//input[contains(@value, '예') or contains(@value, '확인')]"),
+            (By.CSS_SELECTOR, "input[id*='_btn_yes'], input[id*='_btn_confirm']"),
             (By.CSS_SELECTOR, ".btn_cm.pt"),
+
         ]
         
         # 3. 버튼 탐색 및 클릭 시도
@@ -132,21 +133,24 @@ def cancel_existing_discount(driver, wait):
             for btn in btns:
                 if btn.is_displayed():
                     driver.execute_script("arguments[0].click();", btn)
-                    time.sleep(1.0)
-                    # 팝업 확인 처리 (네이티브 alert 또는 DOM 모달)
+                    time.sleep(1.2)
+                    
+                    # 1. 네이티브 alert 확인 (브라우저 기본 경고창)
                     try:
                         alert = driver.switch_to.alert
                         alert.accept()
                         time.sleep(0.5)
-                    except:
-                        # 커스텀 DOM 모달 대응 ("예" 버튼 클릭)
-                        if click_yes_button(driver):
-                            print("   [재처리] 팝업 '예' 버튼 처리 성공")
-                        
-                        print("   [재처리] 기존 할인권 전체 취소 명령 전달 완료")
-                        cancelled = True
-                        break
-                if cancelled: break
+                    except: pass
+                    
+                    # 2. 커스텀 DOM 팝업(WebSquare) 확인 및 닫기
+                    # "이미 취소...", "성공적으로..." 등 모든 알림의 '확인'/'예' 버튼 처리
+                    if click_yes_button(driver):
+                        print("   [재처리] 안내 팝업('확인'/'예') 처리 완료")
+                    
+                    cancelled = True
+                    print("   [재처리] 취소 명령 전달 완료 및 중복 방지를 위해 탈출")
+                    break
+            if cancelled: break
         
         if not cancelled:
             print("   [재처리] 취소 버튼 없음 (기존 할인 없는 상태이거나 이미 초기화됨)")
@@ -285,38 +289,24 @@ def run_bot():
                         # 4자리 추출 (검색용)
                         last_4 = car_number.replace(" ", "")[-4:]
                         
-                        # 번호 입력 (가상 키패드 대응)
+                        # 번호 입력 (네이티브 클릭 엔진 이식)
+                        print(f"      - 가상 키패드 네이티브 클릭을 이용해 {last_4} 입력 중...")
                         for digit in last_4:
-                            digit_str = str(digit)
-                            print(f"      - 숫자 {digit_str} 입력 중...")
-                            success = False
+                            digit_int = int(digit)
+                            uuid_prefix = "mf_wfm_body_wq_uuid_"
+                            uuid_suffix = 140 + (digit_int - 1) * 2 if digit_int != 0 else 158
                             
-                            # 1. 태그에 상관없이 숫자를 텍스트로 가진 요소 탐색 (가장 확실함)
                             try:
-                                # 웹스퀘어 가상 키패드 내부에서 해당하는 숫자 텍스트를 가진 요소 클릭
-                                digit_btn = driver.find_element(By.XPATH, f"//div[@id='mf_wfm_body']//*[text()='{digit_str}']")
-                                if digit_btn.is_displayed():
-                                    driver.execute_script("arguments[0].click();", digit_btn)
-                                    success = True
-                                    print(f"      - 숫자 {digit_str} 입력 성공")
-                            except: pass
-                            
-                            # 2. 보조용 ID 기반 (실패 시 대비)
-                            if not success:
-                                try:
-                                    digit_int = int(digit)
-                                    uuid_suffix = 140 + (digit_int - 1) * 2 if digit_int != 0 else 158
-                                    btn = driver.find_element(By.ID, f"mf_wfm_body_wq_uuid_{uuid_suffix}")
-                                    driver.execute_script("arguments[0].click();", btn)
-                                    success = True
-                                except: pass
-                            
-                            time.sleep(0.4)
+                                btn = wait.until(EC.element_to_be_clickable((By.ID, f"{uuid_prefix}{uuid_suffix}")))
+                                btn.click()
+                                time.sleep(0.3)
+                            except Exception as e:
+                                print(f"      - [경고] UUID 탐색 실패, 폴백 시도 중... ({e})")
+                                driver.find_element(By.XPATH, f"//a[text()='{digit}']").click()
                         
-                        # 조회 버튼 클릭 (JS 방식으로 가로막힘 방지)
+                        # 조회 버튼 클릭 (local.py와 동일하게 네이티브 클릭 적용)
                         print("      - 조회 버튼 클릭 중...")
-                        search_btn = wait.until(EC.presence_of_element_located((By.ID, "mf_wfm_body_wq_uuid_162")))
-                        driver.execute_script("arguments[0].click();", search_btn)
+                        wait.until(EC.element_to_be_clickable((By.ID, "mf_wfm_body_wq_uuid_162"))).click()
                         time.sleep(1.5)
 
 
@@ -349,15 +339,14 @@ def run_bot():
                                             break
                                     if alert_type: break
                                 
-                                # 상태에 따른 서버 보고
-                                time.sleep(1.0)
-                                clear_input_field(driver)
-                                
-                                if alert_type == 'not_found':
+                                # 알림창 닫기 후, 입차 시간을 추출하기 위해 로직을 계속 진행 (continue 제거)
+                                if alert_type == 'already_done':
+                                    print("      - [알림] 이미 할인된 차량입니다. 입차 정보 수집을 위해 계속 진행합니다.")
+                                    # 여기서 바로 리턴하지 않고 아래의 '상세 매칭' 로직으로 내려가게 합니다.
+                                elif alert_type == 'not_found':
                                     mark_as_discounted(log_id, status='not_found')
-                                else:
-                                    mark_as_discounted(log_id, status='success', entry_time='이미 적용됨')
-                                continue
+                                    clear_input_field(driver)
+                                    continue
                         except: pass
 
                         # --- 상세 매칭 및 입차시간 수집 ---
@@ -390,30 +379,34 @@ def run_bot():
 
                                                     # 실제 <button> 태그 정밀 타겟팅 (사용자 제공 정보 반영)
                                                     try:
-                                                        # 행 내부의 모든 button 중 '선택' 텍스트를 가진 요소 탐색
-                                                        action_btns = p_row.find_elements(By.XPATH, ".//button[text()='선택' or contains(text(), '선택')]")
-                                                        if not action_btns:
-                                                            # 폴백: td 내부의 버튼 구조
-                                                            action_btns = p_row.find_elements(By.XPATH, ".//td[contains(@value, '선택')]//button")
-                                                        
-                                                        if action_btns:
-                                                            driver.execute_script("arguments[0].click();", action_btns[0])
+                                                        if alert_type == 'already_done':
+                                                            print("      - [진행] 이미 할인된 차량이므로 '선택' 클릭은 생략하고 정보만 수집합니다.")
                                                         else:
-                                                            # 최후의 수단: 텍스트 기반 클릭
-                                                            fallback_btn = p_row.find_element(By.XPATH, ".//*[contains(text(), '선택')]")
-                                                            driver.execute_script("arguments[0].click();", fallback_btn)
+                                                            # 행 내부의 모든 button 중 '선택' 텍스트를 가진 요소 탐색
+                                                            action_btns = p_row.find_elements(By.XPATH, ".//button[text()='선택' or contains(text(), '선택')]")
+                                                            if not action_btns:
+                                                                # 폴백: td 내부의 버튼 구조
+                                                                action_btns = p_row.find_elements(By.XPATH, ".//td[contains(@value, '선택')]//button")
+                                                            
+                                                            if action_btns:
+                                                                driver.execute_script("arguments[0].click();", action_btns[0])
+                                                            else:
+                                                                # 최후의 수단: 텍스트 기반 클릭
+                                                                fallback_btn = p_row.find_element(By.XPATH, ".//*[contains(text(), '선택')]")
+                                                                driver.execute_script("arguments[0].click();", fallback_btn)
                                                     except Exception as btn_err:
-                                                        print(f"   [주의] 선택 버튼 클릭 실패: {btn_err}")
+                                                        if alert_type != 'already_done':
+                                                            print(f"   [주의] 선택 버튼 클릭 실패: {btn_err}")
 
                                                     matched = True
-                                                    time.sleep(2.0) # 팝업 닫힘 대기
+                                                    if alert_type != 'already_done':
+                                                        time.sleep(2.0) # 팝업 닫힘 대기
                                                     break
                                             
                                             if matched: break
                                             
                                             # 다음 페이지 버튼 확인 및 클릭
                                             try:
-                                                # 사용자 제공 ID 및 Value 적용
                                                 next_btn = None
                                                 try:
                                                     next_btn = driver.find_element(By.ID, "mf_wfm_body_btnNextCar")
@@ -431,34 +424,26 @@ def run_bot():
                                         if not matched:
                                             print(f"   [실패] 모든 페이지 탐색했으나 {car_number} 없음. 팝업을 닫습니다 (강력 모드).")
                                             try:
-                                                # 공식 구조 반영: value='닫기'인 input 및 조상 탐색
                                                 close_btn = None
-                                                try:
-                                                    close_btn = driver.find_element(By.ID, "mf_wfm_body_wq_uuid_250") # ID는 변할 수 있음
+                                                try: close_btn = driver.find_element(By.ID, "mf_wfm_body_wq_uuid_250")
                                                 except: pass
                                                 
                                                 if not close_btn:
-                                                    try:
-                                                        close_btn = driver.find_element(By.XPATH, "//input[@value='닫기']")
-                                                    except:
-                                                        close_btn = driver.find_element(By.XPATH, "//*[text()='닫기' or contains(text(), '닫기')]")
+                                                    try: close_btn = driver.find_element(By.XPATH, "//input[@value='닫기']")
+                                                    except: close_btn = driver.find_element(By.XPATH, "//*[text()='닫기' or contains(text(), '닫기')]")
                                                
-                                                if close_btn:
-                                                    driver.execute_script("arguments[0].click();", close_btn)
+                                                if close_btn: driver.execute_script("arguments[0].click();", close_btn)
                                                 
-                                                # 백업: X 버튼 탐색
                                                 x_btns = driver.find_elements(By.XPATH, "//*[contains(@class, 'close') and contains(@class, 'window')] | //a[contains(@class, 'w2window_close')]")
                                                 for x in x_btns:
-                                                    if x.is_displayed():
-                                                        driver.execute_script("arguments[0].click();", x)
+                                                    if x.is_displayed(): driver.execute_script("arguments[0].click();", x)
                                                 
-                                                time.sleep(1.5) # 닫힘 대기
+                                                time.sleep(1.5)
                                             except Exception as close_err:
                                                 print(f"   [주의] 팝업 닫기 버튼 작동 실패: {close_err}")
 
                                 except Exception as e:
                                     print(f"   [주의] 팝업 처리 중 건너뜀: {e}")
-
                             # 2. [목록] 검색 결과 목록(Table)에서 선택
                             if not matched:
                                 rows = driver.find_elements(By.CSS_SELECTOR, "tr[id*='gen_searchList']")
@@ -474,7 +459,8 @@ def run_bot():
                                                 entry_time = t.split()[-1]
                                                 break
                                         
-                                        row.click()
+                                        if alert_type != 'already_done':
+                                            row.click()
                                         matched = True
                                         time.sleep(1.0)
                                         break
@@ -553,8 +539,14 @@ def run_bot():
                             if modal.is_displayed():
                                 print("   [조치] _modal 팝업 감지 → JS로 강제 숨김 처리")
                                 driver.execute_script("document.getElementById('_modal').style.display='none';")
-                                time.sleep(0.5)
                         except: pass
+
+                        # --- 이미 할인된 경우(already_done) 최종 처리 ---
+                        if alert_type == 'already_done':
+                            print(f"   [성공] 이미 할인된 차량 확인 완료. 입차시간: {entry_time}")
+                            mark_as_discounted(log_id, status='success', entry_time=entry_time)
+                            clear_input_field(driver)
+                            continue # 다음 차량으로
 
                         # --- 사전 검증 (Pre-check) ---
                         time.sleep(1.0)

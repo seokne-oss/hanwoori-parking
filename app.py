@@ -368,13 +368,14 @@ def delete_all_data():
 @app.route('/api/pending-discounts', methods=['GET'])
 def get_pending_discounts():
     kst = timezone(timedelta(hours=9))
-    one_day_ago = datetime.now(kst) - timedelta(days=1)
+    # 서버(UTC)와 한국(KST) 시차(9시간)를 고려하여 최근 48시간(2일) 데이터를 수집 (d-1, d, d+1 대응)
+    two_days_ago = datetime.now(kst) - timedelta(days=2)
     
     pending = ParkingLog.query.filter(
         ParkingLog.is_processed == True,
         ParkingLog.is_discounted == False,
-        (ParkingLog.remarks == None) | (~ParkingLog.remarks.contains('[차량번호 확인 안됨]')),
-        ParkingLog.created_at >= one_day_ago
+        (ParkingLog.remarks == None) | (~ParkingLog.remarks.contains('[차량번호 확인 안됨]') & ~ParkingLog.remarks.contains('[할인적용실패]')),
+        ParkingLog.created_at >= two_days_ago
     ).order_by(ParkingLog.updated_at.desc().nullslast(), ParkingLog.created_at.asc()).all()
     
     return {
@@ -434,14 +435,12 @@ def update_hours(log_id):
     log.updated_at = datetime.now(kst)
 
     if was_discounted:
-        # ★ 주차처리완료 이후 시간 변경
-        # entry_time 유지 → is_retry=True → 봇이 기존 할인 취소 후 재등록
+        # ★ 주차처리완료 이후 시간 변경: 기존 입차시간 유지
         pass
     else:
-        # 처리 전 시간 변경: 최초 등록처럼 초기화
-        log.entry_time = None
-        if log.remarks:
-            log.remarks = log.remarks.replace('[차량번호 확인 안됨]', '').replace('[할인적용실패]', '').replace('  ', ' ').strip() or None
+        # 처리 전 시간 변경: 기존 입차시간이 있다면 유지하고, 없으면 None (초기화 방지)
+        if not log.entry_time:
+            log.entry_time = None
 
     db.session.commit()
     return {'status': 'success', 'stay_hours': log.stay_hours, 'log_id': log_id, 'was_discounted': was_discounted}
