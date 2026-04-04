@@ -35,6 +35,7 @@ instance/
 
 # Logs
 *.log
+logs/
 
 # 로컬 테스트용 봇 및 도구 (보안 및 테스트 목적)
 nicepark_bot.py

@@ -21,6 +21,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'  # requirements.txt 기반 자동 파이썬 패키지 캐시
 
       - name: Install dependencies
         run: |
@@ -36,8 +37,8 @@ jobs:
           GITHUB_ACTIONS: "true"
         run: python nicepark_bot_action.py
 
-      - name: Upload Screenshot on Diagnosis
-        if: always()
+      - name: Upload Screenshot on Failure
+        if: failure()  # 로그인 실패 등 오류 시에만 업로드
         uses: actions/upload-artifact@v4
         with:
           name: login-error-screenshot

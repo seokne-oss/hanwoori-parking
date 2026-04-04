@@ -144,8 +144,8 @@ def index():
         ).first()
 
         if duplicate:
-            flash(f'이미 등록된 차량입니다. ({duplicate.created_at.strftime("%H:%M")} 등록됨)', 'warning')
-            return redirect(url_for('status', phone=phone))
+            reg_time = duplicate.created_at.strftime('%H:%M')
+            return redirect(url_for('index', already='1', phone=phone, reg_time=reg_time))
 
         new_log = ParkingLog(
             name=name,
@@ -161,7 +161,14 @@ def index():
         # 등록 즉시 주차 현황 페이지로 이동
         return redirect(url_for('status', phone=phone))
 
-    return render_template('index.html')
+    # 중복 등록 확인 정보
+    already_info = None
+    if request.args.get('already'):
+        already_info = {
+            'phone': request.args.get('phone', ''),
+            'time': request.args.get('reg_time', '')
+        }
+    return render_template('index.html', already_info=already_info)
 
 # 2. 봉사자용 관리 페이지
 @app.route('/admin')
@@ -352,7 +359,7 @@ def delete_all_data():
         return redirect(url_for('login'))
 
     try:
-        db.session.query(ParkingLog).delete()
+        num_deleted = db.session.query(ParkingLog).delete()
         db.session.commit()
         flash(f'모든 주차 기록 {num_deleted}건이 영구적으로 삭제되었습니다.', 'admin_info')
     except Exception as e:

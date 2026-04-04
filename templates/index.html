@@ -42,21 +42,45 @@
             border-color: var(--hanwoori-green);
             box-shadow: 0 0 0 0.25rem rgba(0, 106, 78, 0.25);
         }
-        /* 라디오 버튼을 버튼처럼 보이게 하는 스타일 */
-        .btn-check:checked+.btn-outline-info {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-            color: white;
+        /* 파스텔 톤 커스텀 버튼 스타일 */
+        .btn-parking {
+            border-width: 2px !important;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 1.1rem;
         }
-        .btn-check:checked+.btn-outline-success {
-            background-color: #198754;
-            border-color: #198754;
-            color: white;
+        /* 3시간 블루 */
+        .btn-outline-pastel-blue {
+            color: #1971c2;
+            border-color: rgba(116, 192, 252, 0.5);
+            background-color: #fff;
         }
-        .btn-check:checked+.btn-outline-secondary {
-            background-color: #6c757d;
-            border-color: #6c757d;
-            color: white;
+        .btn-check:checked+.btn-outline-pastel-blue {
+            background-color: #339af0 !important;
+            border-color: rgba(25, 113, 194, 0.8) !important;
+            color: #fff !important;
+        }
+        /* 6시간 그린 */
+        .btn-outline-pastel-green {
+            color: #2b8e3c;
+            border-color: rgba(99, 230, 190, 0.5);
+            background-color: #fff;
+        }
+        .btn-check:checked+.btn-outline-pastel-green {
+            background-color: #40c057 !important;
+            border-color: rgba(43, 138, 62, 0.8) !important;
+            color: #fff !important;
+        }
+        /* 9시간 오렌지 */
+        .btn-outline-pastel-orange {
+            color: #e67e22;
+            border-color: rgba(255, 192, 120, 0.5);
+            background-color: #fff;
+        }
+        .btn-check:checked+.btn-outline-pastel-orange {
+            background-color: #fd7e14 !important;
+            border-color: rgba(217, 72, 15, 0.8) !important;
+            color: #fff !important;
         }
         .status-link a {
             color: var(--hanwoori-green);
@@ -77,8 +101,25 @@
         <p class="text-center text-muted">광명역 D주차장 이용 성도님께서는<br>아래 정보를 입력해주세요.</p>
 
         {% set messages = get_flashed_messages(with_categories=true) %}
-        
-        {% if messages %}
+
+        {# 중복 등록 안내 카드 #}
+        {% if already_info %}
+          <div class="card border-warning my-4 shadow-sm">
+            <div class="card-body py-3">
+              <div class="d-flex align-items-start gap-3">
+                <span style="font-size: 1.8rem; line-height:1;">&#x26A0;&#xFE0F;</span>
+                <div>
+                  <p class="mb-1 fw-bold" style="color:#856404;">이미 등록된 차량입니다.</p>
+                  <p class="mb-2 text-muted small">오늘 {{ already_info.time }} 에 이미 등록되었습니다.<br>등록 하신 현황을 확인하시겠습니까?</p>
+                  <a href="{{ url_for('status', phone=already_info.phone) }}"
+                    class="btn btn-warning btn-sm fw-bold">
+                    등록 현황 보기 &#x261E;
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% elif messages %}
             {% for category, message in messages %}
               {# 어드민 전용 메시지(admin_info)는 일반 사용자 페이지에서 숨김 #}
               {% if category != 'admin_info' %}
@@ -115,13 +156,22 @@
                 <label class="form-label">주차 할인 시간</label>
                 <div class="d-flex justify-content-between gap-2">
                     <input type="radio" class="btn-check" name="stay_hours" id="time-3" value="3시간" autocomplete="off" required>
-                    <label class="btn btn-outline-info w-100" for="time-3">3시간</label>
+                    <label class="btn btn-outline-pastel-blue btn-parking w-100 d-flex flex-column justify-content-center align-items-center py-2" style="min-height: 64px;" for="time-3">
+                        <span class="text-nowrap">3시간</span>
+                        <small class="d-block" style="font-size: 0.7rem; opacity: 0;">&nbsp;</small>
+                    </label>
 
                     <input type="radio" class="btn-check" name="stay_hours" id="time-6" value="6시간" autocomplete="off" required>
-                    <label class="btn btn-outline-success w-100" for="time-6">6시간</label>
+                    <label class="btn btn-outline-pastel-green btn-parking w-100 d-flex flex-column justify-content-center align-items-center py-2" style="min-height: 64px;" for="time-6">
+                        <span class="text-nowrap">6시간</span>
+                        <small class="d-block" style="font-size: 0.7rem; opacity: 0;">&nbsp;</small>
+                    </label>
 
                     <input type="radio" class="btn-check" name="stay_hours" id="time-9" value="9시간" autocomplete="off" required>
-                    <label class="btn btn-outline-secondary w-100" for="time-9">9시간(종일)</label>
+                    <label class="btn btn-outline-pastel-orange btn-parking w-100 d-flex flex-column justify-content-center align-items-center py-2 px-1" style="min-height: 64px;" for="time-9">
+                        <span class="text-nowrap">9시간</span>
+                        <small class="d-block text-nowrap" style="font-size: 0.7rem; opacity: 0.8;">(종일)</small>
+                    </label>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary w-100 py-2 mt-3">등록하기</button>

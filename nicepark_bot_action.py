@@ -1,5 +1,6 @@
 import time
 import os
+import re
 import requests
 import sys
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,41 @@ NICEPARK_ID = os.environ.get("NICEPARK_ID")
 NICEPARK_PW = os.environ.get("NICEPARK_PW")
 # GitHub Action 버전은 항상 헤드리스로 실행되며 자동 로그인을 시도합니다.
 
+# --- 로그 파일 설정 ---
+class TeeLogger:
+    """stdout 출력을 콘솔과 파일에 동시에 기록합니다."""
+    def __init__(self, filepath):
+        self._terminal = sys.stdout
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        self._log = open(filepath, 'a', encoding='utf-8')
+
+    def write(self, message):
+        self._terminal.write(message)
+        self._log.write(message)
+        self._log.flush()
+
+    def flush(self):
+        self._terminal.flush()
+        self._log.flush()
+
+    def close(self):
+        self._log.close()
+
+_log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+_log_path = os.path.join(_log_dir, f"bot_{datetime.now().strftime('%Y%m%d')}.log")
+sys.stdout = TeeLogger(_log_path)
+
+def reset_to_discount_page(driver):
+    """'검색된 차량 없음' 등 오류 후 '할인적용' 메뉴를 클릭하여 입력 화면을 초기화합니다."""
+    try:
+        menu_label = driver.find_element(By.ID, "mf_wfm_header_firstMenuGen_0_menu1_label")
+        menu_link = menu_label.find_element(By.TAG_NAME, "a")
+        driver.execute_script("arguments[0].click();", menu_link)
+        time.sleep(1.2)
+        print("   [초기화] '할인적용' 메뉴 클릭 → 화면 초기화 완료")
+    except Exception as e:
+        print(f"   [주의] 화면 초기화(할인적용 메뉴) 실패: {e}")
+
 def clear_input_field(driver):
     """차량번호 입력 필드를 가상 키패드의 지우기 버튼을 사용하여 초기화합니다."""
     try:
@@ -46,6 +82,34 @@ def clear_input_field(driver):
         print("   [조치] 가상 키패드 지우기 버튼을 통해 입력 필드 초기화 완료")
     except Exception as e:
         print(f"   [오류] 입력 필드 초기화 실패: {e}")
+
+def close_all_overlays(driver):
+    """차량 처리 전 남아있는 모든 오버레이/레이어를 JS로 강제로 닫습니다.
+    첫 번째 차량 처리 후 carListLayer가 active 상태로 잔류하는 버그 방지."""
+    try:
+        driver.execute_script("""
+            var carLayer = document.getElementById('mf_wfm_body_carListLayer');
+            if (carLayer) {
+                carLayer.classList.remove('active');
+                carLayer.style.display = 'none';
+                carLayer.style.visibility = 'hidden';
+            }
+            ['_modal', '__modal', '___processbar2', '___processbar2_1'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) { el.style.display = 'none'; el.style.visibility = 'hidden'; }
+            });
+        """)
+        print("   [정리] 잔류 오버레이/레이어 강제 초기화 완료")
+    except Exception as e:
+        print(f"   [주의] 오버레이 초기화 오류: {e}")
+
+def extract_hhmm(text):
+    """텍스트에서 HH:MM 형식의 시간만 안전하게 추출합니다.
+    '2024-01-15 10:30:00' → '10:30' 처럼 긴 문자열도 처리."""
+    if not text:
+        return None
+    match = re.search(r'\b([01]?\d|2[0-3]):([0-5]\d)(?::\d{2})?\b', text)
+    return f"{match.group(1).zfill(2)}:{match.group(2)}" if match else None
 
 def click_yes_button(driver, timeout=3):
     """WebSquare 커스텀 팝업의 '예' 버튼을 방해 요소 제거 후 다각도로 클릭 시도합니다."""
@@ -192,11 +256,20 @@ def run_bot():
     print(f"나이스파크 자동 할인 봇 시작 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
     print(f"서버 주소: {FLASK_SERVER_URL}")
     print("=" * 50)
+    # ★ [사전 확인] RUN_ONCE(GitHub Actions) 환경에서는 로그인 전에 처리 대상 먼저 조회
+    # → 대기 항목이 없으면 Chrome 드라이버 실행 자체를 생략하여 리소스 절약
+    if RUN_ONCE:
+        print("[사전 확인] 처리 대기 항목 조회 중...")
+        pre_check = get_pending_discounts()
+        if not pre_check or pre_check['count'] == 0:
+            print("[완료] 처리 대기 항목 없음 → 나이스파크 로그인 생략 후 종료합니다.")
+            return
+        print(f"[확인] {pre_check['count']}건 처리 대기 중 → 나이스파크 접속 및 로그인 진행.")
 
     # 크롬 드라이버 설정
     chrome_options = Options()
     # GitHub Action 버전은 화면 없이 실행합니다.
-    chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
@@ -283,70 +356,111 @@ def run_bot():
                     is_retry = item.get('is_retry', False)  # 시간 수정 후 재처리 여부
                     
                     retry_label = "[재처리]" if is_retry else "[최초]"
-                    print(f"   [진행] {retry_label} {car_number} ({stay_hours}) 처리 중...")
-                    
+                    print(f"")
+                    print(f"{'='*44}")
+                    print(f"   ▶ {retry_label} {car_number} ({stay_hours}) 처리 시작")
+                    print(f"{'='*44}")
+
+                    # 처리 시작 전 '할인적용' 메뉴 클릭으로 화면 초기화 후 페이지 로드 대기
+                    reset_to_discount_page(driver)
+                    try:
+                        wait.until(EC.element_to_be_clickable((By.ID, "mf_wfm_body_wq_uuid_162")))
+                        print(f"   [준비] 할인적용 페이지 로드 완료 → 키패드 입력 시작")
+                    except:
+                        print(f"   [주의] 조회 버튼 대기 시간 초과, 계속 진행")
+
                     try:
                         # 4자리 추출 (검색용)
                         last_4 = car_number.replace(" ", "")[-4:]
-                        
-                        # 번호 입력 (네이티브 클릭 엔진 이식)
-                        print(f"      - 가상 키패드 네이티브 클릭을 이용해 {last_4} 입력 중...")
+
+                        # [1단계] 가상 키패드 입력
+                        print(f"   [1단계] 가상 키패드 입력: '{last_4}' (차량번호: {car_number})")
                         for digit in last_4:
                             digit_int = int(digit)
                             uuid_prefix = "mf_wfm_body_wq_uuid_"
                             uuid_suffix = 140 + (digit_int - 1) * 2 if digit_int != 0 else 158
-                            
+
                             try:
                                 btn = wait.until(EC.element_to_be_clickable((By.ID, f"{uuid_prefix}{uuid_suffix}")))
                                 btn.click()
                                 time.sleep(0.3)
                             except Exception as e:
-                                print(f"      - [경고] UUID 탐색 실패, 폴백 시도 중... ({e})")
-                                driver.find_element(By.XPATH, f"//a[text()='{digit}']").click()
-                        
-                        # 조회 버튼 클릭 (local.py와 동일하게 네이티브 클릭 적용)
-                        print("      - 조회 버튼 클릭 중...")
+                                print(f"      - [경고] UUID 클릭 실패(digit={digit}), 폴백 시도 중...")
+                                try:
+                                    fallback_btn = driver.find_element(
+                                        By.XPATH,
+                                        f"//input[contains(@class,'carNumBtn') and @value='{digit}']"
+                                    )
+                                    fallback_btn.click()
+                                    print(f"      - [폴백 성공] input[@value='{digit}'] 클릭")
+                                except Exception as e2:
+                                    print(f"      - [오류] '{digit}' 입력 최종 실패: {e2}")
+
+                        # [2단계] 조회 버튼 클릭
+                        print(f"   [2단계] '{last_4}' 입력완료 → 조회 버튼 클릭")
                         wait.until(EC.element_to_be_clickable((By.ID, "mf_wfm_body_wq_uuid_162"))).click()
                         time.sleep(1.5)
 
 
-                        # --- 알림창 감지 (중복 할인, 차량 없음 등) ---
+                        # --- 알림창 감지 (DOM 기반: title="알림" 헤더 탐지) ---
                         alert_type = None # None, 'not_found', 'already_done'
                         try:
-                            # 1. 텍스트 감지
-                            page_text = driver.page_source
-                            if "검색된 차량이 없습니다" in page_text:
-                                print(f"   [알림] 검색 결과가 없습니다. ({car_number})")
-                                alert_type = 'not_found'
-                            elif "최대 사용매수" in page_text or "이미 사용" in page_text:
-                                print(f"   [알림] 이미 할인이 적용된 차량입니다. ({car_number})")
-                                alert_type = 'already_done'
-                            
-                            # 2. 알림창 닫기 및 상태 보고
-                            if alert_type:
-                                selectors = [
-                                    (By.CSS_SELECTOR, "input[id$='_btn_conf']"), 
-                                    (By.XPATH, "//input[@value='확인']"),
-                                    (By.XPATH, "//*[contains(text(), '확인')]")
-                                ]
-                                for by_type, selector in selectors:
-                                    btns = driver.find_elements(by_type, selector)
-                                    for btn in btns:
-                                        if btn.is_displayed():
-                                            driver.execute_script("arguments[0].click();", btn)
-                                            print(f"   [조치] 알림창({alert_type}) 닫기 완료")
-                                            time.sleep(0.5)
-                                            break
-                                    if alert_type: break
-                                
-                                # 알림창 닫기 후, 입차 시간을 추출하기 위해 로직을 계속 진행 (continue 제거)
-                                if alert_type == 'already_done':
-                                    print("      - [알림] 이미 할인된 차량입니다. 입차 정보 수집을 위해 계속 진행합니다.")
-                                    # 여기서 바로 리턴하지 않고 아래의 '상세 매칭' 로직으로 내려가게 합니다.
-                                elif alert_type == 'not_found':
-                                    mark_as_discounted(log_id, status='not_found')
-                                    clear_input_field(driver)
-                                    continue
+                            # 1. "알림" 팝업 헤더 DOM 탐지
+                            alert_visible = driver.execute_script("""
+                                var headers = document.querySelectorAll("div[id*='alert'][id$='_header']");
+                                for (var h of headers) {
+                                    if (h.title === '알림' && h.offsetParent !== null) return true;
+                                }
+                                return false;
+                            """)
+
+                            if alert_visible:
+                                # 2. 팝업 종류 판별 (textarea 텍스트 검색 불가 → DOM 상태로 구분)
+                                # - 차량번호 표시(mf_wfm_body_carNoText)가 비어있으면 → 차량 없음
+                                # - 차량번호 + 적용시간(mf_wfm_body_invokedTkSpan) 둘 다 있으면 → 이미 할인됨
+                                car_no_text = driver.execute_script("""
+                                    var el = document.getElementById('mf_wfm_body_carNoText');
+                                    return el ? el.textContent.trim() : '';
+                                """)
+                                invoked_text = driver.execute_script("""
+                                    var el = document.getElementById('mf_wfm_body_invokedTkSpan');
+                                    return el ? el.textContent.trim() : '';
+                                """)
+                                print(f"   [팝업 분석] carNoText='{car_no_text}' / invokedTkSpan='{invoked_text}'")
+
+                                if car_no_text == '':
+                                    print(f"   [알림] 알림창 감지 + 차량번호 없음 → '검색된 차량이 없습니다' 간주 ({car_number})")
+                                    alert_type = 'not_found'
+                                elif car_no_text and invoked_text:
+                                    print(f"   [알림] 알림창 감지 + 차량번호/시간 있음 → '최대 사용매수 초과' 간주 ({car_number})")
+                                    alert_type = 'already_done'
+                                else:
+                                    print(f"   [알림] 알림창 감지됐으나 유형 불명 → ESC로 닫고 계속 진행")
+                                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
+                                    time.sleep(0.5)
+
+                            # 3. 알림창 닫기 (ESC 키 우선)
+                            if alert_type == 'not_found':
+                                print(f"   [조치] 알림창 닫기 → ESC 키 입력")
+                                try:
+                                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
+                                    time.sleep(0.8)
+                                    print(f"   [조치] ESC 키 입력 완료 → 팝업 닫힘")
+                                except Exception as e:
+                                    print(f"   [주의] ESC 키 실패: {e}")
+
+                                mark_as_discounted(log_id, status='not_found')
+                                reset_to_discount_page(driver)
+                                continue
+
+                            elif alert_type == 'already_done':
+                                # already_done: ESC로 닫고 입차시간 수집 계속
+                                print(f"   [조치] 알림창 닫기 → ESC 키 입력")
+                                try:
+                                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ESCAPE)
+                                    time.sleep(0.5)
+                                except: pass
+                                print("      - [알림] 이미 할인된 차량입니다. 입차 정보 수집을 위해 계속 진행합니다.")
                         except: pass
 
                         # --- 상세 매칭 및 입차시간 수집 ---
@@ -371,11 +485,11 @@ def run_bot():
                                                 if car_number.replace(" ", "") in p_text:
                                                     print(f"   [매칭] 팝업 {pages_checked}페이지에서 '{car_number}' 일치 항목 선택")
                                                     
-                                                    # 입차시간 추출
-                                                    if ":" in p_row.text:
-                                                        time_parts = [t for t in p_row.text.split() if ":" in t]
-                                                        if time_parts:
-                                                            entry_time = time_parts[-1]
+                                                    # 입차시간 추출 (정규식 기반 안전 파싱)
+                                                    extracted = extract_hhmm(p_row.text)
+                                                    if extracted:
+                                                        entry_time = extracted
+                                                        print(f"   [정보] 입차시간 추출: {entry_time}")
 
                                                     # 실제 <button> 태그 정밀 타겟팅 (사용자 제공 정보 반영)
                                                     try:
@@ -454,9 +568,10 @@ def run_bot():
                                         
                                         tds = row.find_elements(By.TAG_NAME, "td")
                                         for td in tds:
-                                            t = td.text.strip()
-                                            if ":" in t and (len(t) == 5 or len(t) >= 16):
-                                                entry_time = t.split()[-1]
+                                            extracted = extract_hhmm(td.text.strip())
+                                            if extracted:
+                                                entry_time = extracted
+                                                print(f"   [정보] 입차시간 추출: {entry_time}")
                                                 break
                                         
                                         if alert_type != 'already_done':
@@ -488,17 +603,12 @@ def run_bot():
                                                 car_inp = driver.find_element(By.ID, "mf_wfm_body_carNoText")
                                                 input_val = car_inp.get_attribute("value").replace(" ", "")
                                                 print(f"   [검증] 입력창 값: '{input_val}' / 등록: '{car_number_clean}'")
-                                                if input_val and (car_number_clean[-4:] in input_val or input_val[-4:] in car_number_clean):
+                                                if input_val and (car_number_clean in input_val or input_val in car_number_clean):
                                                     car_verified = True
                                             except: pass
 
-                                        # 방법3: page_source 뒤 4자리 폴백
-                                        if not car_verified:
-                                            try:
-                                                if car_number_clean[-4:] in driver.page_source.replace(" ", ""):
-                                                    print(f"   [검증] 페이지에서 뒤 4자리({car_number_clean[-4:]}) 확인 → 매칭 허용")
-                                                    car_verified = True
-                                            except: pass
+                                        # 방법3: 뒤 4자리 폴백은 제거 — 다른 차량과 오탐 발생 위험 높음
+                                        # (예: 등록 '111가2222' vs 나이스파크 '01더2222' → 4자리 '2222' 일치로 오매칭)
 
                                         if car_verified:
                                             print(f"   [매칭] 단일 결과 즉시 매칭 성공")
@@ -511,9 +621,9 @@ def run_bot():
                                             ]:
                                                 try:
                                                     for el in driver.find_elements(By.XPATH, xpath):
-                                                        t = el.text.strip()
-                                                        if ':' in t and len(t) >= 5:
-                                                            entry_time = t.split()[-1]
+                                                        extracted = extract_hhmm(el.text.strip())
+                                                        if extracted:
+                                                            entry_time = extracted
                                                             print(f"   [정보] 입차시간 추출: {entry_time}")
                                                             break
                                                     if entry_time: break
@@ -525,8 +635,8 @@ def run_bot():
 
                             if not matched:
                                 print(f"   [실패] 전체 번호 {car_number} 매칭 실패 (차량 선택 불가)")
-                                clear_input_field(driver)
                                 mark_as_discounted(log_id, status='not_found')
+                                reset_to_discount_page(driver)
                                 continue
                         except Exception as e:
                             print(f"   [오류] 상세 매칭 분석 중 에러: {e}")
@@ -545,7 +655,7 @@ def run_bot():
                         if alert_type == 'already_done':
                             print(f"   [성공] 이미 할인된 차량 확인 완료. 입차시간: {entry_time}")
                             mark_as_discounted(log_id, status='success', entry_time=entry_time)
-                            clear_input_field(driver)
+                            reset_to_discount_page(driver)
                             continue # 다음 차량으로
 
                         # --- 사전 검증 (Pre-check) ---
@@ -625,12 +735,12 @@ def run_bot():
 
                         except Exception as e:
                             print(f"   [실패] 할인 동작 오류: {e}")
-                            clear_input_field(driver)
                             mark_as_discounted(log_id, status='not_found')
+                            reset_to_discount_page(driver)
 
                     except Exception as e:
                         print(f"   [오류] {car_number} 처리 중 중단: {e}")
-                        clear_input_field(driver)
+                        reset_to_discount_page(driver)
                 
             else:
                 print("   [안내] 대기 항목 없음")
