@@ -268,16 +268,30 @@ def run_bot():
 
     # 크롬 드라이버 설정
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # GitHub Actions 환경: 디스플레이 없음
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-gpu")
 
     # 차단 회피를 위한 User-Agent 설정
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     chrome_options.add_argument(f"user-agent={user_agent}")
-    
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    # Railway 환경 감지: RAILWAY_SERVICE_NAME 또는 RAILWAY_ENVIRONMENT 환경 변수로 판단
+    import shutil
+    IS_RAILWAY = bool(os.environ.get("RAILWAY_SERVICE_NAME") or os.environ.get("RAILWAY_ENVIRONMENT"))
+    if IS_RAILWAY:
+        # Railway(nixpkgs)에 설치된 chromium 바이너리를 탐색하여 사용
+        chromium_bin = shutil.which("chromium") or shutil.which("chromium-browser") or shutil.which("google-chrome")
+        if chromium_bin:
+            chrome_options.binary_location = chromium_bin
+            print(f"[환경] Railway 감지 → chromium 바이너리: {chromium_bin}")
+        else:
+            print("[경고] Railway 환경이나 chromium 바이너리를 찾을 수 없습니다.")
+        driver = webdriver.Chrome(options=chrome_options)  # selenium-manager가 chromedriver 자동 관리
+    else:
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     wait = WebDriverWait(driver, 20) # 대기 시간 20초로 연장
 
     try:
