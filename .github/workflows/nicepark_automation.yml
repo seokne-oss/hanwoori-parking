@@ -4,9 +4,9 @@ on:
   schedule:
     # 한국 시간(KST) 기준 일요일(주일) 오전 7시 ~ 오후 10시(22:00)까지 5분 간격 실행
     # 1. KST 07:00 ~ 08:55 대응 (UTC 기준 토요일 22:00 ~ 23:55)
-    - cron: '*/5 22-23 * * 6'
+    - cron: "*/5 22-23 * * 6"
     # 2. KST 09:00 ~ 22:55 대응 (UTC 기준 일요일 00:00 ~ 13:55)
-    - cron: '*/5 0-13 * * 0'
+    - cron: "*/5 0-13 * * 0"
   workflow_dispatch: # 수동 실행 버튼 유지
 
 jobs:
@@ -15,13 +15,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-          cache: 'pip'  # requirements.txt 기반 자동 파이썬 패키지 캐시
+          python-version: "3.12"
+          cache: "pip" # requirements.txt 기반 자동 파이썬 패키지 캐시
 
       - name: Install dependencies
         run: |
@@ -38,7 +38,7 @@ jobs:
         run: python nicepark_bot_action.py
 
       - name: Upload Screenshot on Failure
-        if: failure()  # 로그인 실패 등 오류 시에만 업로드
+        if: failure() # 로그인 실패 등 오류 시에만 업로드
         uses: actions/upload-artifact@v4
         with:
           name: login-error-screenshot
