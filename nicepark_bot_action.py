@@ -268,8 +268,7 @@ def run_bot():
 
     # 크롬 드라이버 설정
     chrome_options = Options()
-    # GitHub Action 버전은 화면 없이 실행합니다.
-    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")  # GitHub Actions 환경: 디스플레이 없음
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--window-size=1920,1080")
@@ -476,47 +475,73 @@ def run_bot():
                                         print(f"   [매칭] '차량번호 선택' 팝업 감지 (전체 페이지 탐색 중...)")
                                         
                                         pages_checked = 0
+                                        car_number_clean = car_number.replace(" ", "")
                                         while not matched and pages_checked < 5: # 최대 5페이지까지 탐색
                                             pages_checked += 1
-                                            # 팝업 내 모든 행(tr)을 탐색
-                                            popup_rows = driver.find_elements(By.XPATH, "//tr[contains(., '선택')]")
-                                            for p_row in popup_rows:
-                                                p_text = p_row.text.replace(" ", "")
-                                                if car_number.replace(" ", "") in p_text:
-                                                    print(f"   [매칭] 팝업 {pages_checked}페이지에서 '{car_number}' 일치 항목 선택")
-                                                    
-                                                    # 입차시간 추출 (정규식 기반 안전 파싱)
-                                                    extracted = extract_hhmm(p_row.text)
-                                                    if extracted:
-                                                        entry_time = extracted
-                                                        print(f"   [정보] 입차시간 추출: {entry_time}")
+                                            # col_id="carNo" td 중 현재 화면에 보이는 것만 처리
+                                            # (페이지 이동 후에도 이전 페이지 DOM이 남아 있으므로 is_displayed() 필터 필수)
+                                            car_no_tds = driver.find_elements(By.XPATH, "//td[@col_id='carNo']")
+                                            for car_td in car_no_tds:
+                                                # 화면에 보이지 않는 요소(이전 페이지 잔존 DOM) 제외
+                                                try:
+                                                    if not car_td.is_displayed():
+                                                        continue
+                                                except:
+                                                    continue
 
-                                                    # 실제 <button> 태그 정밀 타겟팅 (사용자 제공 정보 반영)
-                                                    try:
-                                                        if alert_type == 'already_done':
-                                                            print("      - [진행] 이미 할인된 차량이므로 '선택' 클릭은 생략하고 정보만 수집합니다.")
-                                                        else:
-                                                            # 행 내부의 모든 button 중 '선택' 텍스트를 가진 요소 탐색
-                                                            action_btns = p_row.find_elements(By.XPATH, ".//button[text()='선택' or contains(text(), '선택')]")
-                                                            if not action_btns:
-                                                                # 폴백: td 내부의 버튼 구조
-                                                                action_btns = p_row.find_elements(By.XPATH, ".//td[contains(@value, '선택')]//button")
-                                                            
-                                                            if action_btns:
-                                                                driver.execute_script("arguments[0].click();", action_btns[0])
-                                                            else:
-                                                                # 최후의 수단: 텍스트 기반 클릭
-                                                                fallback_btn = p_row.find_element(By.XPATH, ".//*[contains(text(), '선택')]")
-                                                                driver.execute_script("arguments[0].click();", fallback_btn)
-                                                    except Exception as btn_err:
-                                                        if alert_type != 'already_done':
-                                                            print(f"   [주의] 선택 버튼 클릭 실패: {btn_err}")
+                                                try:
+                                                    popup_car = car_td.find_element(By.TAG_NAME, "nobr").text.replace(" ", "")
+                                                except:
+                                                    popup_car = car_td.text.replace(" ", "")
 
-                                                    matched = True
+                                                print(f"   [팝업 확인] 화면 차량번호: '{popup_car}' / 등록: '{car_number_clean}'")
+
+                                                if not popup_car:
+                                                    continue
+                                                # 공백 제거 후 전체 번호 완전 일치만 허용 (부분 포함 불가)
+                                                if popup_car != car_number_clean:
+                                                    print(f"   [팝업 스킵] '{popup_car}' 은 '{car_number_clean}' 과 다름")
+                                                    continue
+
+                                                # td ID에서 행 인덱스 추출 → 같은 행의 버튼 td를 ID로 정확히 특정
+                                                # ID 형식: mf_wfm_body_list_carGridView_cell_{rowIdx}_{colIdx}
+                                                td_id = car_td.get_attribute("id") or ""
+                                                btn_td_id = td_id.replace("_1_", "_3_") if "_1_" in td_id else ""
+
+                                                # 입차시간 추출
+                                                p_row = car_td.find_element(By.XPATH, "./ancestor::tr[1]")
+                                                extracted = extract_hhmm(p_row.text)
+                                                if extracted:
+                                                    entry_time = extracted
+                                                    print(f"   [정보] 입차시간 추출: {entry_time}")
+
+                                                print(f"   [매칭] 팝업 {pages_checked}페이지에서 '{popup_car}' 정확 일치 → 선택 (td id: {btn_td_id or 'fallback'})")
+                                                try:
+                                                    if alert_type == 'already_done':
+                                                        print("      - [진행] 이미 할인된 차량이므로 '선택' 클릭은 생략하고 정보만 수집합니다.")
+                                                    else:
+                                                        # 1순위: ID로 버튼 td를 정확히 찾아 클릭
+                                                        clicked = False
+                                                        if btn_td_id:
+                                                            try:
+                                                                btn = driver.find_element(By.ID, btn_td_id).find_element(By.TAG_NAME, "button")
+                                                                driver.execute_script("arguments[0].click();", btn)
+                                                                clicked = True
+                                                            except:
+                                                                pass
+                                                        # 2순위: 같은 tr 안의 col_id="carBtn" 버튼
+                                                        if not clicked:
+                                                            btn = p_row.find_element(By.XPATH, ".//td[@col_id='carBtn']//button")
+                                                            driver.execute_script("arguments[0].click();", btn)
+                                                except Exception as btn_err:
                                                     if alert_type != 'already_done':
-                                                        time.sleep(2.0) # 팝업 닫힘 대기
-                                                    break
-                                            
+                                                        print(f"   [주의] 선택 버튼 클릭 실패: {btn_err}")
+
+                                                matched = True
+                                                if alert_type != 'already_done':
+                                                    time.sleep(2.0) # 팝업 닫힘 대기
+                                                break
+
                                             if matched: break
                                             
                                             # 다음 페이지 버튼 확인 및 클릭
@@ -593,7 +618,7 @@ def run_bot():
                                             car_td = driver.find_element(By.XPATH, "//td[@data-title='차량번호']")
                                             shown_car = car_td.text.replace(" ", "")
                                             print(f"   [검증] 화면 차량번호: '{shown_car}' / 등록: '{car_number_clean}'")
-                                            if car_number_clean in shown_car or shown_car in car_number_clean:
+                                            if shown_car and (car_number_clean in shown_car or shown_car in car_number_clean):
                                                 car_verified = True
                                         except: pass
 
@@ -650,6 +675,38 @@ def run_bot():
                                 print("   [조치] _modal 팝업 감지 → JS로 강제 숨김 처리")
                                 driver.execute_script("document.getElementById('_modal').style.display='none';")
                         except: pass
+
+                        # --- 차량번호 최종 검증 (할인 적용 전 필수 확인) ---
+                        # 팝업에서 잘못된 차량이 선택된 경우를 방지하기 위해
+                        # 화면에 표시된 전체 차량번호가 등록 차량번호와 일치하는지 반드시 확인
+                        if alert_type != 'already_done':
+                            time.sleep(0.8)
+                            confirmed_car = None
+                            car_number_clean = car_number.replace(" ", "")
+                            try:
+                                car_td = driver.find_element(By.XPATH, "//td[@data-title='차량번호']")
+                                confirmed_car = car_td.text.replace(" ", "")
+                            except: pass
+                            if not confirmed_car:
+                                try:
+                                    car_inp = driver.find_element(By.ID, "mf_wfm_body_carNoText")
+                                    confirmed_car = car_inp.get_attribute("value").replace(" ", "")
+                                except: pass
+
+                            if confirmed_car:
+                                # 공백 제거 후 전체 번호 완전 일치만 허용 (부분 포함 불가)
+                                if confirmed_car == car_number_clean:
+                                    print(f"   [검증 통과] 화면 차량번호 '{confirmed_car}' ↔ 등록 '{car_number_clean}' 일치 → 할인 적용 진행")
+                                else:
+                                    print(f"   [검증 실패] 화면 차량번호 '{confirmed_car}' ↔ 등록 '{car_number_clean}' 불일치 → 할인 적용 중단")
+                                    mark_as_discounted(log_id, status='not_found')
+                                    reset_to_discount_page(driver)
+                                    continue
+                            else:
+                                print(f"   [경고] 선택 후 화면에서 차량번호를 읽을 수 없음 → 안전을 위해 할인 적용 중단")
+                                mark_as_discounted(log_id, status='not_found')
+                                reset_to_discount_page(driver)
+                                continue
 
                         # --- 이미 할인된 경우(already_done) 최종 처리 ---
                         if alert_type == 'already_done':

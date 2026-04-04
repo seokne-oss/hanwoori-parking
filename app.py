@@ -226,6 +226,7 @@ def admin():
 def status():
     phone = request.args.get('phone')
     logs = []
+    not_found = False
     if phone:
         # 오늘 날짜에 해당 전화번호로 등록된 가장 최신 기록을 찾음
         kst = timezone(timedelta(hours=9))
@@ -239,9 +240,9 @@ def status():
         ).order_by(ParkingLog.created_at.desc()).all()
 
         if not logs:
-            flash(f"'{phone}' 번호로 최근 등록된 주차 정보가 없습니다.", 'warning')
+            not_found = True
 
-    return render_template('status.html', logs=logs, phone=phone)
+    return render_template('status.html', logs=logs, phone=phone, not_found=not_found)
 
 
 @app.route('/admin/process/<int:log_id>', methods=['POST'])

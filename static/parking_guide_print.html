@@ -199,11 +199,26 @@
         border-bottom: 6px solid transparent;
       }
 
-      .ptr-name   { top: 40%; left: 78mm; }
-      .ptr-phone  { top: 51%; left: 78mm; }
-      .ptr-car    { top: 60%; left: 78mm; }
-      .ptr-time   { top: 76%; left: 78mm; }
-      .ptr-submit { top: 86%; left: 78mm; }
+      .ptr-name {
+        top: 40%;
+        left: 78mm;
+      }
+      .ptr-phone {
+        top: 51%;
+        left: 78mm;
+      }
+      .ptr-car {
+        top: 60%;
+        left: 78mm;
+      }
+      .ptr-time {
+        top: 76%;
+        left: 78mm;
+      }
+      .ptr-submit {
+        top: 86%;
+        left: 78mm;
+      }
 
       .ptr-name::after,
       .ptr-phone::after,
@@ -219,7 +234,9 @@
       }
 
       /* 모바일 전용 스텝 목록 (PC에서는 숨김) */
-      .mobile-steps { display: none; }
+      .mobile-steps {
+        display: none;
+      }
 
       /* 운영 시간 및 문의 */
       .footer-container {
@@ -238,7 +255,9 @@
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .ops-item { text-align: center; }
+      .ops-item {
+        text-align: center;
+      }
       .ops-label {
         font-size: 9pt;
         opacity: 0.8;
@@ -259,7 +278,6 @@
         font-size: 14pt;
         margin: 0 5px;
       }
-
 
       /* ===========================
          모바일 레이아웃
@@ -362,7 +380,9 @@
         }
 
         /* 포인터 라벨 숨김 */
-        .label-ptr { display: none; }
+        .label-ptr {
+          display: none;
+        }
 
         /* 모바일 전용 스텝 카드 */
         .mobile-steps {
@@ -379,7 +399,7 @@
           border: 1px solid #e0ede8;
           border-radius: 12px;
           padding: 12px 14px;
-          box-shadow: 0 1px 4px rgba(0,106,78,0.06);
+          box-shadow: 0 1px 4px rgba(0, 106, 78, 0.06);
         }
         .step-num {
           flex-shrink: 0;
@@ -419,8 +439,12 @@
           margin-bottom: 14px;
           gap: 4px;
         }
-        .ops-label { font-size: 11px; }
-        .ops-value { font-size: 14px; }
+        .ops-label {
+          font-size: 11px;
+        }
+        .ops-value {
+          font-size: 14px;
+        }
         .contact-info {
           font-size: 13px;
         }
@@ -457,7 +481,9 @@
               1. <strong>차량번호 전체</strong>를 정확히 입력해주세요.<br />
               &nbsp;&nbsp;&nbsp;(예: 12가 3456)
             </div>
-            <div class="info-item">2. 등록 즉시 자동 할인이 적용됩니다.</div>
+            <div class="info-item">
+              2. 등록 후 5분후에 자동 할인이 적용됩니다.
+            </div>
           </div>
         </div>
 
@@ -482,7 +508,9 @@
           <div class="mobile-steps">
             <div class="step-item">
               <div class="step-num">1</div>
-              <div class="step-text"><strong>본인 성함</strong>을 입력하세요.</div>
+              <div class="step-text">
+                <strong>본인 성함</strong>을 입력하세요.
+              </div>
             </div>
             <div class="step-item">
               <div class="step-num">2</div>
@@ -490,15 +518,24 @@
             </div>
             <div class="step-item">
               <div class="step-num">3</div>
-              <div class="step-text"><strong>차량번호 전체</strong>를 정확히 입력하세요.<br /><span style="font-size:12px;color:#888">(예: 12가 3456)</span></div>
+              <div class="step-text">
+                <strong>차량번호 전체</strong>를 정확히 입력하세요.<br /><span
+                  style="font-size: 12px; color: #888"
+                  >(예: 12가 3456)</span
+                >
+              </div>
             </div>
             <div class="step-item">
               <div class="step-num">4</div>
-              <div class="step-text"><strong>필요 시간</strong>을 선택하세요.</div>
+              <div class="step-text">
+                <strong>필요 시간</strong>을 선택하세요.
+              </div>
             </div>
             <div class="step-item">
               <div class="step-num">5</div>
-              <div class="step-text"><strong>등록하기</strong> 버튼을 클릭하세요.</div>
+              <div class="step-text">
+                <strong>등록하기</strong> 버튼을 클릭하세요.
+              </div>
             </div>
           </div>
         </div>
@@ -523,8 +560,11 @@
 
         <div class="contact-info">
           주차 등록 관련 문의 (문자 전송)<br />
-          <strong>010-2509-1197</strong> 또는 <strong>010-2295-6271</strong><br />
-          <span style="font-size: 9pt; color: #888">(성함, 차량번호와 함께 문의 내용을 보내주세요)</span>
+          <strong>010-2509-1197</strong> 또는 <strong>010-2295-6271</strong
+          ><br />
+          <span style="font-size: 9pt; color: #888"
+            >(성함, 차량번호와 함께 문의 내용을 보내주세요)</span
+          >
         </div>
       </div>
     </div>
