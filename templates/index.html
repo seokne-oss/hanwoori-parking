@@ -130,8 +130,11 @@
               {% endif %}
             {% endfor %}
         {% else %}
-            <div class="text-center my-4 status-link">
-                <a href="{{ url_for('status') }}">이미 등록하셨나요? 내 등록 현황 확인하기</a>
+            <div class="text-center mt-3 mb-4 status-link">
+                <a href="{{ url_for('status') }}" class="d-block mb-2">이미 등록하셨나요? 내 등록 현황 확인하기</a>
+                <a href="{{ url_for('static', filename='parking_guide_print.html') }}" style="font-size: 0.95rem; opacity: 0.85;">
+                    <i class="bi bi-info-circle me-1"></i> 주차 등록 방법 안내 (안내문 확인)
+                </a>
             </div>
         {% endif %}
 

@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>한우리교회 주차 등록 안내</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap");
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Noto Sans KR", sans-serif;
+        background: #f0f0f0;
+        color: #333;
+      }
+
+      /* ===========================
+         PC / 인쇄 레이아웃 (A4)
+         =========================== */
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 15mm 20mm;
+        margin: 10mm auto;
+        background: #fff;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+      }
+
+      @media print {
+        body {
+          background: none;
+        }
+        .page {
+          margin: 0;
+          box-shadow: none;
+          width: 210mm;
+          height: 297mm;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+
+      /* 헤더 */
+      .header {
+        text-align: center;
+        margin-bottom: 10mm;
+        border-bottom: 4px solid #006a4e;
+        padding-bottom: 5mm;
+      }
+      .church-logo {
+        height: 18mm;
+        margin-bottom: 3mm;
+      }
+      .title {
+        font-size: 32pt;
+        font-weight: 900;
+        color: #1a1a1a;
+        margin-bottom: 2mm;
+      }
+      .subtitle {
+        font-size: 14pt;
+        color: #006a4e;
+        font-weight: 700;
+      }
+
+      /* 메인 레이아웃 */
+      .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 10mm;
+        flex-grow: 1;
+      }
+
+      /* 왼쪽: QR 및 정보 */
+      .left-col {
+        display: flex;
+        flex-direction: column;
+        gap: 8mm;
+      }
+
+      .qr-section {
+        background: #f8fdf9;
+        border: 2px solid #006a4e;
+        border-radius: 5mm;
+        padding: 8mm;
+        text-align: center;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .qr-image {
+        width: 55mm;
+        height: 55mm;
+        margin-bottom: 5mm;
+        border: 1px solid #ddd;
+      }
+      .qr-text {
+        font-size: 13pt;
+        font-weight: 700;
+        color: #006a4e;
+        line-height: 1.4;
+      }
+
+      .info-box {
+        background: #fff3e0;
+        border-radius: 4mm;
+        padding: 6mm;
+        border: 1px solid #fcd5a0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .info-title {
+        font-size: 13pt;
+        font-weight: 700;
+        color: #c05621;
+        margin-bottom: 3mm;
+        display: flex;
+        align-items: center;
+        gap: 2mm;
+      }
+      .info-item {
+        font-size: 11pt;
+        margin-bottom: 25px;
+        line-height: 1.5;
+      }
+      .info-item strong {
+        color: #006a4e;
+        font-size: 12pt;
+      }
+
+      /* 오른쪽: 모바일 캡처 가이드 */
+      .right-col {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .guide-title {
+        font-size: 16pt;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin-bottom: 5mm;
+        width: 100%;
+        text-align: center;
+      }
+      .mobile-capture-container {
+        position: relative;
+        width: 75mm;
+        min-height: 145mm;
+        border: 4px solid #333;
+        border-radius: 8mm;
+        overflow: visible;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        background: #eee url("IMG/mobile_capture.png") no-repeat center/cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        font-size: 10pt;
+      }
+      .mobile-image {
+        width: 100%;
+        display: block;
+        border-radius: 6mm;
+      }
+      .mobile-capture-container::before {
+        position: absolute;
+        z-index: 0;
+      }
+
+      /* 설명 라벨 (Pointer) */
+      .label-ptr {
+        position: absolute;
+        background: #006a4e;
+        color: #fff;
+        padding: 2mm 4mm;
+        border-radius: 50px;
+        font-size: 10pt;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .label-ptr::after {
+        content: "";
+        position: absolute;
+        width: 0;
+        height: 0;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+      }
+
+      .ptr-name   { top: 40%; left: 78mm; }
+      .ptr-phone  { top: 51%; left: 78mm; }
+      .ptr-car    { top: 60%; left: 78mm; }
+      .ptr-time   { top: 76%; left: 78mm; }
+      .ptr-submit { top: 86%; left: 78mm; }
+
+      .ptr-name::after,
+      .ptr-phone::after,
+      .ptr-car::after,
+      .ptr-time::after,
+      .ptr-submit::after {
+        left: -10px;
+        right: auto;
+        top: 50%;
+        border-right: 10px solid #006a4e;
+        border-left: none;
+        margin-top: -6px;
+      }
+
+      /* 모바일 전용 스텝 목록 (PC에서는 숨김) */
+      .mobile-steps { display: none; }
+
+      /* 운영 시간 및 문의 */
+      .footer-container {
+        margin-top: 10mm;
+        border-top: 2px solid #eee;
+        padding-top: 8mm;
+      }
+      .ops-info {
+        display: flex;
+        justify-content: space-around;
+        background: #006a4e;
+        color: #fff;
+        padding: 5mm;
+        border-radius: 3mm;
+        margin-bottom: 5mm;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .ops-item { text-align: center; }
+      .ops-label {
+        font-size: 9pt;
+        opacity: 0.8;
+        margin-bottom: 1mm;
+      }
+      .ops-value {
+        font-size: 13pt;
+        font-weight: 700;
+      }
+      .contact-info {
+        text-align: center;
+        font-size: 11pt;
+        color: #555;
+        line-height: 1.6;
+      }
+      .contact-info strong {
+        color: #006a4e;
+        font-size: 14pt;
+        margin: 0 5px;
+      }
+
+
+      /* ===========================
+         모바일 레이아웃
+         =========================== */
+      @media screen and (max-width: 700px) {
+        body {
+          background: #f7f9f8;
+        }
+
+        .page {
+          width: 100%;
+          min-height: unset;
+          padding: 16px 16px 24px;
+          margin: 0;
+          box-shadow: none;
+          border-radius: 0;
+        }
+
+        /* 헤더 */
+        .header {
+          margin-bottom: 20px;
+          padding-bottom: 16px;
+          border-bottom-width: 3px;
+        }
+        .church-logo {
+          height: 40px;
+          margin-bottom: 8px;
+        }
+        .title {
+          font-size: 22px;
+          margin-bottom: 4px;
+        }
+        .subtitle {
+          font-size: 13px;
+        }
+
+        /* 그리드 → 단일 컬럼 */
+        .main-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        /* QR 섹션 */
+        .qr-section {
+          padding: 20px;
+          border-radius: 12px;
+        }
+        .qr-image {
+          width: 48vw;
+          max-width: 180px;
+          height: auto;
+          aspect-ratio: 1;
+          margin-bottom: 12px;
+        }
+        .qr-text {
+          font-size: 14px;
+        }
+
+        /* 안내 박스 */
+        .info-box {
+          border-radius: 12px;
+          padding: 16px;
+        }
+        .info-title {
+          font-size: 15px;
+          margin-bottom: 10px;
+        }
+        .info-item {
+          font-size: 13px;
+          margin-bottom: 12px;
+          line-height: 1.6;
+        }
+        .info-item strong {
+          font-size: 14px;
+        }
+
+        /* 오른쪽 컬럼 */
+        .right-col {
+          align-items: stretch;
+        }
+        .guide-title {
+          font-size: 17px;
+          margin-bottom: 12px;
+          text-align: center;
+        }
+
+        /* 모바일: 폰 목업 + 라벨 숨기고 이미지만 표시 */
+        .mobile-capture-container {
+          width: 56vw;
+          max-width: 200px;
+          min-height: unset;
+          margin: 0 auto;
+          border-radius: 14px;
+          border-width: 3px;
+          background-size: cover;
+        }
+        .mobile-image {
+          border-radius: 11px;
+        }
+
+        /* 포인터 라벨 숨김 */
+        .label-ptr { display: none; }
+
+        /* 모바일 전용 스텝 카드 */
+        .mobile-steps {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 16px;
+        }
+        .step-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          background: #fff;
+          border: 1px solid #e0ede8;
+          border-radius: 12px;
+          padding: 12px 14px;
+          box-shadow: 0 1px 4px rgba(0,106,78,0.06);
+        }
+        .step-num {
+          flex-shrink: 0;
+          width: 28px;
+          height: 28px;
+          background: #006a4e;
+          color: #fff;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 700;
+        }
+        .step-text {
+          font-size: 14px;
+          line-height: 1.5;
+          padding-top: 4px;
+        }
+        .step-text strong {
+          color: #006a4e;
+        }
+
+        /* 푸터 → 모바일에서 맨 위로 */
+        .footer-container {
+          order: -1;
+          margin-top: 0;
+          margin-bottom: 16px;
+          padding-top: 0;
+          border-top: none;
+          border-bottom: 1px solid #e0ede8;
+          padding-bottom: 16px;
+        }
+        .ops-info {
+          padding: 14px 10px;
+          border-radius: 12px;
+          margin-bottom: 14px;
+          gap: 4px;
+        }
+        .ops-label { font-size: 11px; }
+        .ops-value { font-size: 14px; }
+        .contact-info {
+          font-size: 13px;
+        }
+        .contact-info strong {
+          font-size: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- 헤더 -->
+      <div class="header">
+        <img src="IMG/CI_home.png" alt="한우리교회 로고" class="church-logo" />
+        <div class="title">주차 할인 등록 안내</div>
+        <div class="subtitle">광명역 D 환승주차장 이용 성도 전용</div>
+      </div>
+
+      <!-- 메인 그리드 -->
+      <div class="main-grid">
+        <!-- 왼쪽: QR 코드 및 이용 수칙 -->
+        <div class="left-col">
+          <div class="qr-section">
+            <img src="IMG/QR.jpg" alt="주차 등록 QR코드" class="qr-image" />
+            <div class="qr-text">
+              카메라로 QR 스캔<br />
+              또는 주차장 안내 주소 접속
+            </div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-title">📌 꼭 확인해주세요!</div>
+            <div class="info-item">
+              1. <strong>차량번호 전체</strong>를 정확히 입력해주세요.<br />
+              &nbsp;&nbsp;&nbsp;(예: 12가 3456)
+            </div>
+            <div class="info-item">2. 등록 즉시 자동 할인이 적용됩니다.</div>
+          </div>
+        </div>
+
+        <!-- 오른쪽: 모바일 캡처 이미지 가이드 -->
+        <div class="right-col">
+          <div class="guide-title">모바일 등록 화면 예시</div>
+          <div class="mobile-capture-container">
+            <img
+              src="IMG/mobile_capture.png"
+              alt="모바일 화면"
+              class="mobile-image"
+            />
+            <!-- PC용 포인터 라벨 -->
+            <div class="label-ptr ptr-name">본인 성함 입력</div>
+            <div class="label-ptr ptr-phone">연락처 입력</div>
+            <div class="label-ptr ptr-car">차량번호 전체<br />(정확히!)</div>
+            <div class="label-ptr ptr-time">필요 시간 선택</div>
+            <div class="label-ptr ptr-submit">등록하기 버튼 클릭</div>
+          </div>
+
+          <!-- 모바일 전용: 입력 순서 스텝 카드 -->
+          <div class="mobile-steps">
+            <div class="step-item">
+              <div class="step-num">1</div>
+              <div class="step-text"><strong>본인 성함</strong>을 입력하세요.</div>
+            </div>
+            <div class="step-item">
+              <div class="step-num">2</div>
+              <div class="step-text"><strong>연락처</strong>를 입력하세요.</div>
+            </div>
+            <div class="step-item">
+              <div class="step-num">3</div>
+              <div class="step-text"><strong>차량번호 전체</strong>를 정확히 입력하세요.<br /><span style="font-size:12px;color:#888">(예: 12가 3456)</span></div>
+            </div>
+            <div class="step-item">
+              <div class="step-num">4</div>
+              <div class="step-text"><strong>필요 시간</strong>을 선택하세요.</div>
+            </div>
+            <div class="step-item">
+              <div class="step-num">5</div>
+              <div class="step-text"><strong>등록하기</strong> 버튼을 클릭하세요.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단: 운영 및 문의 -->
+      <div class="footer-container">
+        <div class="ops-info">
+          <div class="ops-item">
+            <div class="ops-label">운영 요일</div>
+            <div class="ops-value">매주 일요일</div>
+          </div>
+          <div class="ops-item">
+            <div class="ops-label">운영 시간</div>
+            <div class="ops-value">07:00 ~ 22:00</div>
+          </div>
+          <div class="ops-item">
+            <div class="ops-label">주차장명</div>
+            <div class="ops-value">광명역D 환승주차장</div>
+          </div>
+        </div>
+
+        <div class="contact-info">
+          주차 등록 관련 문의 (문자 전송)<br />
+          <strong>010-2509-1197</strong> 또는 <strong>010-2295-6271</strong><br />
+          <span style="font-size: 9pt; color: #888">(성함, 차량번호와 함께 문의 내용을 보내주세요)</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
