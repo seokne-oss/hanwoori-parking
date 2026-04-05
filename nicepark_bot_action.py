@@ -282,14 +282,20 @@ def run_bot():
     import shutil
     IS_RAILWAY = bool(os.environ.get("RAILWAY_SERVICE_NAME") or os.environ.get("RAILWAY_ENVIRONMENT"))
     if IS_RAILWAY:
-        # Railway(nixpkgs)에 설치된 chromium 바이너리를 탐색하여 사용
+        # nixpkgs로 설치된 chromium + chromedriver를 함께 사용 (버전 일치 보장)
         chromium_bin = shutil.which("chromium") or shutil.which("chromium-browser") or shutil.which("google-chrome")
+        chromedriver_bin = shutil.which("chromedriver")
         if chromium_bin:
             chrome_options.binary_location = chromium_bin
-            print(f"[환경] Railway 감지 → chromium 바이너리: {chromium_bin}")
+            print(f"[환경] Railway 감지 → chromium: {chromium_bin}")
         else:
             print("[경고] Railway 환경이나 chromium 바이너리를 찾을 수 없습니다.")
-        driver = webdriver.Chrome(options=chrome_options)  # selenium-manager가 chromedriver 자동 관리
+        if chromedriver_bin:
+            print(f"[환경] Railway 감지 → chromedriver: {chromedriver_bin}")
+            driver = webdriver.Chrome(service=Service(chromedriver_bin), options=chrome_options)
+        else:
+            print("[경고] chromedriver를 찾을 수 없습니다. selenium-manager로 폴백합니다.")
+            driver = webdriver.Chrome(options=chrome_options)
     else:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     wait = WebDriverWait(driver, 20) # 대기 시간 20초로 연장
